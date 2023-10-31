@@ -1,7 +1,7 @@
 # update price for Square
 # input: woo > Products > All Products > Export > all
 library(dplyr)
-woo <- read.csv("../Square/wc-product-export-30-10-2023-1698685138568.csv", as.is = T)
+woo <- read.csv("../woo/wc-product-export-30-10-2023-1698685138568.csv", as.is = T)
 woo1 <- woo %>% filter(!is.na(woo$Regular.price) & !duplicated(woo$SKU) & !(woo$SKU == "")) 
 woo1[grep("-", woo1$Stock), "Stock"] <- 0
 woo1$Stock <- as.numeric(woo1$Stock)
