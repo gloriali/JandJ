@@ -12,4 +12,4 @@ square <- data.frame(ItemName = woo1$SKU, SKU = woo1$SKU, Description = "", Cate
 rownames(square) <- square$SKU
 square$TaxPST <- gsub("parent", "N", gsub("full", "Y", square$TaxPST))
 square[sales$SKU, "Price"] <- sales[sales$SKU, "Sale.price"]
-write.csv(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), row.names = F, col.names = c(colnames(square)[1:ncol(square)-1], "Tax-PST(7%)"), na = "")
+write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), sep = ",", row.names = F, col.names = c(colnames(square)[1:ncol(square)-1], "Tax-PST(7%)"), na = "")
