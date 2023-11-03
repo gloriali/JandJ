@@ -16,9 +16,9 @@ write.csv(clover, file = "../Clover/inventory20231031-items-upload.csv", row.nam
 library(dplyr)
 mastersku <- read.csv("../woo/1-MasterSKU-All-Product-2023-10-25.csv", skip = 3, header = T, as.is = T, colClasses = c(UPC.Active = "character"))
 rownames(mastersku) <- mastersku$MSKU
-clover <- read.csv("../Clover/inventory20231031-items.csv", as.is = T)
+clover <- read.csv("../Clover/inventory20231102-items.csv", as.is = T)
 clover$Product.Code <- mastersku[clover$SKU, "UPC.Active"]
-write.csv(clover, file = "../Clover/inventory20231031-items-upload.csv", row.names = F, na = "")
+write.csv(clover, file = "../Clover/inventory20231102-items-upload.csv", row.names = F, na = "")
 
 # -------- Combine Vancouver Baby left over with Richmond stock -------- 
 library(dplyr)
