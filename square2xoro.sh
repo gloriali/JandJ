@@ -2,7 +2,7 @@
 # convert square sales report to xoro upload format
 
 cd ~/OneDrive\ -\ Jan\ and\ Jul/TWK\ -\ Gloria/Square/
-items="items-2023-11-02-2023-11-03.csv"; # Square website > Transactions > Export Items Detail CSV;
+items="items-2023-11-10-2023-11-11.csv"; # Square website > Transactions > Export Items Detail CSV;
 customers="customers.csv"; # Square website > Customers > Export Customers
 out="square2xoro-"$(date +%Y%m%d)".csv";
 
