@@ -4,3 +4,4 @@
 [square2xoro.sh](./square2xoro.sh): prepare Square sales for xoro upload - run at request and email Garman.   
 [square.R](./square.R): sync square inventory with xoro, price with woo - update routinely.    
 [reward.R](./reward.R): add POS sales to yotpo rewards program system - update routinely.    
+[shippingTracking.R](./shippingTracking.R): track China to global shipping PO.   
