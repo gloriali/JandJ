@@ -44,4 +44,5 @@ POn <- paste0("P", c(203))
 POtrack <- loadWorkbook(paste0("../PO/", season, " China to Global Shipment Tracking.xlsx"))
 PO <- read.xlsx(paste0("../PO/order/", list.files(path = "../PO/order/", pattern = paste0(POn, ".*.xlsx"), recursive = T)), sheet = 1)
 
+openXL(POtrack)
 
