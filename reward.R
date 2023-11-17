@@ -4,8 +4,7 @@
 # sales: Clover > Transactions > Payments > select dates > Export
 library(dplyr)
 customer <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Customers-", format(Sys.Date(), "%Y%m%d")))), as.is = T) %>%
-  mutate(Name = paste0(First.Name, " ", Last.Name)) %>% 
-  filter(Name != " ", Email.Address != "")
+  mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "")
 rownames(customer) <- customer$Name
 
 payments <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")))), as.is = T) 
@@ -18,9 +17,9 @@ point <- data.frame(Email = payments$email, Points = as.integer(payments$Amount 
 ## --------------- Square sales to yotpo --------------
 # customer info: Square > Customers > Export customers
 # sales: Square > Transactions > select dates > Export Transactions CSV
-square_customer <- read.csv(paste0("../Square/", list.files(path = "../Square/", pattern = paste0("customers-", format(Sys.Date(), "%Y%m%d")))), as.is = T)
+square_customer <- read.csv("../Square/customers.csv", as.is = T)
 rownames(square_customer) <- square_customer$Square.Customer.ID
-transactions <- read.csv(paste0("../Square/", list.files(path = "../Square/", pattern = paste0("transactions-.*", format(Sys.Date(), "%Y-%m-%d")))), as.is = T) %>%
+transactions <- read.csv("../Square/transactions-2023-11-09-2023-11-17.csv", as.is = T) %>%
   filter(Customer.ID != "")
 point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected))))
 write.csv(point, file = paste0("../yotpo/", format(Sys.Date(), "%m%d%Y"), "-yotpo.csv"), row.names = F)
