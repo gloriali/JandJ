@@ -17,11 +17,11 @@ writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
 
 # ---------------- request stock from Surrey warehouse --------------------
-# download current Surrey stock: wc > Products > All Products > Export; 
+# download current Surrey stock: xoro > Item Inventory Snapshot > Export all - csv; 
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-request <- c("ICP", "IPC", "IPS", "ISB", "WJA", "WMR", "WMT", "WPF")
+request <- c("WGS", "WRM", "AWWJ", "AJA", "BTL", "WJA", "WSF", "LBS", "LBP", "LBT", "BTB", "WPF")
 xoro <- read.csv(paste0("../xoro/", list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"))), as.is = T) %>% filter(Store == "Warehouse - JJ")
 rownames(xoro) <- xoro$Item.
 
