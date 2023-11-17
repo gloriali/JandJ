@@ -66,7 +66,10 @@ POtrack1.column_dimensions['Y'].border = Border(left = thick)
 POtrack.save("../PO/" + season + " China to Global Shipment Tracking.xlsx")
 
 # ----------- input PO -------------
+from openpyxl import Workbook
 from openpyxl import load_workbook
+masterSKUfile = load_workbook(filename = "../PO/1-MasterSKU-All-Product-2023-11-07.xlsx")
+masterSKU = masterSKUfile.active
 POtrack = load_workbook(filename = "../PO/" + season + " China to Global Shipment Tracking.xlsx")
 POtrack1 = POtrack[season]
 
