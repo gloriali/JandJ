@@ -1,4 +1,5 @@
 # Generate Square items library for uploading
+setwd("~/OneDrive - Jan and Jul/TWK - Gloria/JandJ")
 library(dplyr)
 # ------- match Square price to woo ------
 # input: woo > Products > All Products > Export > all
