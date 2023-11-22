@@ -48,6 +48,29 @@ clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_it
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
 
+# -------- Black Friday sales price -------- 
+# download current woo price: wc > Products > All Products > Export.
+# download clover inventory: clover_item > Inventory > Items > Export.
+library(dplyr)
+library(openxlsx)
+woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & !(SKU == "")) 
+rownames(woo) <- woo$SKU
+
+clover <- loadWorkbook(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"))))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = woo[Name, "Regular.price"]*0.8)
+clover_item[grepl("WSS-CNL", clover_item$Name), "Price"] <- 39
+clover_item[grepl("WSS-DNL", clover_item$Name), "Price"] <- 39
+clover_item[grepl("WSS-UNC", clover_item$Name), "Price"] <- 39
+clover_item[grepl("WSS-TRZ", clover_item$Name), "Price"] <- 39
+clover_item[grepl("BRC", clover_item$Name), "Price"] <- 34
+clover_item[grepl("LBS", clover_item$Name), "Price"] <- 27
+clover_item[grepl("AWWJ", clover_item$Name), "Price"] <- 59
+clover_item[grepl("ICP", clover_item$Name), "Price"] <- 69
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+writeData(clover, "Items", clover_item)
+saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
+
 # -------- Combine Vancouver Baby left over with Richmond stock -------- 
 library(dplyr)
 vbaby <- read.csv("../clover_item/inventory20231030-items.csv", as.is = T)
