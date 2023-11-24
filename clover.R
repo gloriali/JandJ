@@ -21,7 +21,7 @@ saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-request <- c("IPC", "ISB", "ISS")
+request <- c("IPS", "FJM", "FPM", "FMR")
 xoro <- read.csv(paste0("../xoro/", list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"))), as.is = T) %>% filter(Store == "Warehouse - JJ")
 rownames(xoro) <- xoro$Item.
 
