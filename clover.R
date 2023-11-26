@@ -21,7 +21,7 @@ saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-request <- c("IPS", "FJM", "FPM", "FMR")
+request <- c("BTT")
 xoro <- read.csv(paste0("../xoro/", list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"))), as.is = T) %>% filter(Store == "Warehouse - JJ")
 rownames(xoro) <- xoro$Item.
 
@@ -67,6 +67,7 @@ clover_item[grepl("BRC", clover_item$Name), "Price"] <- 34
 clover_item[grepl("LBS", clover_item$Name), "Price"] <- 27
 clover_item[grepl("AWWJ", clover_item$Name), "Price"] <- 59
 clover_item[grepl("ICP", clover_item$Name), "Price"] <- 69
+clover_item[grepl("SWS", clover_item$Name), "Price"] <- 25
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
