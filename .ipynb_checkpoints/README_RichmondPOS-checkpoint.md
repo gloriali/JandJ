@@ -7,8 +7,8 @@
 - Match price to website: update weekly (Gloria).   
 - Request stock from Surrey warehouse weekly:   
     + Decide categories (Miranda/Shirley).   
-    + Generate request form (Gloria) and send to (Shitshik).     
-    + Receive stock: Clover - Inventory App - scan barcode - add stock - report any difference to packing slip to Shitshik (Miranda/Shirley).   
+    + Generate request form (Gloria) and send to Shikshit.     
+    + Receive stock: Clover - Inventory App - scan barcode - add stock - report any difference to packing slip to Shikshit (Miranda/Shirley).   
 - Payment methods:    
     + Cash: weekly cash report for Christine; monthly cash count in the register for Christine (Gloria).       
     + Credit/debit card.   
@@ -31,6 +31,6 @@
     + Add note - Original order # or return item SKU.        
 - Issue refund:   
     + Richmond on-site sale: Clover - Order App / Square - Transactions - Find Order # and refund (Miranda/Shirley).         
-    + Online sales: send (Garman) Order #.       
+    + Online sales: send Garman Order # (Miranda/Shirley).       
 - Restock returned/exchanged items: Clover - Inventory App - scan barcode and add stock (Miranda/Shirley).   
 
