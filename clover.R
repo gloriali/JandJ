@@ -21,8 +21,6 @@ saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-n <- 1 # number of items per SKU to stock at Richmond
-request <- c("BTT", "BTL", "WJA", "WPF", "WSF") # categories to restock
 xoro <- read.csv(paste0("../xoro/", list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"))), as.is = T) %>% filter(Store == "Warehouse - JJ")
 rownames(xoro) <- xoro$Item.
 
@@ -31,8 +29,10 @@ clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Na
 clover_item[is.na(clover_item$Quantity) | clover_item$Quantity < 0, "Quantity"] <- 0
 rownames(clover_item) <- clover_item$Name
 
+n <- 1 # number of items per SKU to stock at Richmond
+request <- c("SKX", "KEH", "LBP", "WPF", "WRM", "WSF") # categories to restock
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
-order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > 10) %>% filter(Qty > 0)
+order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > 10) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 
 # -------- master file barcode for clover_item -------------
