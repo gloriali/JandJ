@@ -21,5 +21,13 @@ square_customer <- read.csv("../Square/customers.csv", as.is = T)
 rownames(square_customer) <- square_customer$Square.Customer.ID
 transactions <- read.csv("../Square/transactions-2023-11-09-2023-11-17.csv", as.is = T) %>%
   filter(Customer.ID != "")
-point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected))))
+point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected)))) %>% filter(Points != 0)
 write.csv(point, file = paste0("../yotpo/", format(Sys.Date(), "%m%d%Y"), "-yotpo.csv"), row.names = F)
+
+## --------------- Combine Error reports --------------
+library(dplyr)
+non_included <- read.csv("../yotpo/non_included.csv", as.is = T)
+error <- read.csv("../yotpo/error_report.csv", as.is = T)
+non_included <- bind_rows(non_included, error %>% select(Email, Points)) %>% count(Email, wt = Points)
+write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.names = F, col.names = c("Email", "Points"))
+
