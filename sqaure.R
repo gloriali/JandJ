@@ -3,8 +3,8 @@ setwd("~/OneDrive - Jan and Jul/TWK - Gloria/JandJ")
 library(dplyr)
 # ------- match Square price to woo ------
 # input: woo > Products > All Products > Export > all
-woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T)
-woo <- woo %>% filter(!is.na(woo$Regular.price) & !duplicated(woo$SKU) & !(woo$SKU == "")) 
+woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") 
 sales <- woo %>% filter(!is.na(woo$Sale.price)) 
 rownames(sales) <- sales$SKU
 

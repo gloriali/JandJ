@@ -7,8 +7,8 @@ customer <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", patter
   mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "")
 rownames(customer) <- customer$Name
 
-payments <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")))), as.is = T) 
-payments$email <- customer[payments$Customer.Name, "Email.Address"]
+payments <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")))), as.is = T) %>% 
+  mutate(email = customer[Customer.Name, "Email.Address"])
 payments[is.na(payments$Refund.Amount), "Refund.Amount"] <- 0
 payments <- payments %>% filter(!is.na(email))
 

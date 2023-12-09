@@ -5,9 +5,9 @@
 library(dplyr)
 library(openxlsx)
 woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
-  filter(!is.na(woo$Regular.price) & !duplicated(woo$SKU) & woo$SKU != "") 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") 
 rownames(woo) <- woo$SKU
-sales <- woo %>% filter(!is.na(woo$Sale.price)) 
+sales <- woo %>% filter(!is.na(Sale.price)) 
 rownames(sales) <- sales$SKU
 
 clover <- loadWorkbook(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"))))
