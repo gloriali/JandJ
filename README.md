@@ -8,3 +8,4 @@
 [POtracking.R](./POtracking.R): track China to global shipping PO. - discard, use python instead.   
 [POtracking.ipynb](./POtracking.ipynb): track China to global shipping PO python Jupyter Notebook.  
 [POtracking.py](./POtracking.py): track China to global shipping PO python script.  
+[SKUmanagement.R](./SKUmanagement.R): discontinued SKUs management - update routinely.    
