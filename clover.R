@@ -1,10 +1,11 @@
+# Clover system management
 # -------- woo price for clover -------- 
 # download current woo price: wc > Products > All Products > Export.
 # download clover inventory: clover_item > Inventory > Items > Export.
 library(dplyr)
 library(openxlsx)
 woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
-  filter(!is.na(Regular.price) & !duplicated(SKU) & !(SKU == "")) 
+  filter(!is.na(woo$Regular.price) & !duplicated(woo$SKU) & woo$SKU != "") 
 rownames(woo) <- woo$SKU
 sales <- woo %>% filter(!is.na(woo$Sale.price)) 
 rownames(sales) <- sales$SKU
@@ -29,10 +30,11 @@ clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Na
 clover_item[is.na(clover_item$Quantity) | clover_item$Quantity < 0, "Quantity"] <- 0
 rownames(clover_item) <- clover_item$Name
 
-n <- 1 # number of items per SKU to stock at Richmond
+n <- 1 # Qty per SKU to stock at Richmond
+n_xoro <- 10 # min Qty in stock at Surrey to request
 request <- c("BCV", "WPF", "WJA") # categories to restock
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
-order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > 10) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
+order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 
 # -------- master file barcode for clover_item -------------
@@ -40,7 +42,7 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # download clover inventory: clover_item > Inventory > Items > Export.
 library(dplyr)
 library(openxlsx)
-mastersku <- read.csv("../woo/1-MasterSKU-All-Product-2023-10-25.csv", skip = 3, header = T, as.is = T, colClasses = c(UPC.Active = "character"))
+mastersku <- read.xlsx(paste0("../../TWK 2020 share/", list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-")), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 
 clover <- loadWorkbook(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"))))
