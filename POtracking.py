@@ -1,9 +1,12 @@
 # combine PO files and shipping info into PO tracking file
-season = "2023FW"
+season = "2024SS"
 
 # ------ write header for new Shipment Tracking.xlsx file ------
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
+import os
+if os.path.exists("../PO/" + season + " China to Global Shipment Tracking.xlsx"):
+  os.remove("../PO/" + season + " China to Global Shipment Tracking.xlsx")
 thin = Side(border_style = "thin", color = "000000")
 thick = Side(border_style = "thick", color = "0033CCCC")
 POtrack = Workbook()
@@ -103,24 +106,13 @@ factory.drop(columns = ["Unnamed: 7", "Unnamed: 8", "Unnamed: 9", "Unnamed: 10"]
 factory.rename(columns = {"Unnamed: 2": "JSMY"}, inplace=True)
 factory["id"] = factory.index
 factory = pd.melt(factory, id_vars = "id")
-factory.dropna(axis = 0, how = "any")
+factory = factory.dropna(axis = 0, how = "any")
 factory = pd.Series(factory.variable.values, index = factory.value).to_dict()
 masterSKU = pd.read_excel(glob(os.path.join("../../TWK 2020 share/1-MasterSKU-All-Product-" + "*.xlsx"))[-1], sheet_name = 0, skiprows = 1, header = 2, index_col = 9, usecols = "B:M", engine = "openpyxl")
-
-## PO tracking file and indexes
-POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")[season]
-POtrack_df = pd.DataFrame(POtrack.values)
-PO_r = POtrack_df.shape[0]
-(Detail_r, Detail_c) = POtrack_df.where(POtrack_df.eq("Total PO in Pcs")).stack().index.tolist()[0]
-(T_r, T_c) = POtrack_df.where(POtrack_df.eq("Country/region")).stack().index.tolist()[0]
-(CA_r, CA_c) = POtrack_df.where(POtrack_df.eq("CA/US")).stack().index.tolist()[0]
-(UK_r, UK_c) = POtrack_df.where(POtrack_df.eq("UK")).stack().index.tolist()[0]
-(DE_r, DE_c) = POtrack_df.where(POtrack_df.eq("DE")).stack().index.tolist()[0]
-(CN_r, CN_c) = POtrack_df.where(POtrack_df.eq("CN Initial Reserve")).stack().index.tolist()[0]
-(WS_r, WS_c) = POtrack_df.where(POtrack_df.eq("Wholesaler")).stack().index.tolist()[0]
+masterSKU = masterSKU.set_index(pd.Index(x.upper() for x in masterSKU.index))
 
 ## input PO files
-POn = ["P" + str(n) for n in range(197, 248) if n != 217]
+POn = ["P" + str(n) for n in range(257, 288)]
 for i in POn:
     print(i)
     POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")[season]
@@ -133,8 +125,10 @@ for i in POn:
     (DE_r, DE_c) = POtrack_df.where(POtrack_df.eq("DE")).stack().index.tolist()[0]
     (CN_r, CN_c) = POtrack_df.where(POtrack_df.eq("CN Initial Reserve")).stack().index.tolist()[0]
     (WS_r, WS_c) = POtrack_df.where(POtrack_df.eq("Wholesaler")).stack().index.tolist()[0]
-    file = [y for x in os.walk("../PO/order/") for y in glob(os.path.join(x[0], i + "*.xlsx"))]
+    file = [y for x in os.walk("../PO/order/"+season+"/") for y in glob(os.path.join(x[0], i + "*.xlsx"))]
     print(file)
+    if file == []: 
+      continue
     name = cat = fac = ''
     TotalPO = SKU = Seasons = color_EN = color_CN = Remain_Pc = CA_POplan = CA_Remain_Pc = UK_POplan = UK_Remain_Pc = DE_POplan = DE_Remain_Pc = CN_POplan = CN_Remain_Pc = WS_POplan = WS_Remain_Pc = []
     for f in file:
@@ -159,15 +153,17 @@ for i in POn:
         PO_detail.columns = PO.iloc[SKU_r-1, SKU_c:PO.shape[1]].replace('\n', '', regex = True).replace('\s', '', regex = True).replace('花型/颜色(EN)', '英文品名').replace('花型/颜色(CN)', '中文品名')
         PO_detail['产品编号'] = PO_detail['产品编号'].str.strip()
         PO_detail = PO_detail[PO_detail['产品编号'].notna()]
+        PO_detail = PO_detail[PO_detail['产品编号'].str.contains('-')]
         if total != PO_detail['订单总数量'].sum(): 
             print('ERROR: Total in Pcs does not match.', total, PO_detail['订单总数量'].sum())
+            break
         cat_list = list(dict.fromkeys(PO_detail['产品编号'].replace('-.*', '', regex = True).tolist()))
         fac_list = list(dict.fromkeys([factory[x] for x in cat_list]))
         cat = cat + ' '.join(cat_list)
         fac = fac + ' '.join(fac_list)
         TotalPO = TotalPO + PO_detail['订单总数量'].tolist()
         SKU = SKU + PO_detail['产品编号'].tolist()
-        Seasons = Seasons + masterSKU.loc[PO_detail['产品编号'].tolist(), 'Seasons'].tolist()
+        Seasons = Seasons + masterSKU.loc[[x.upper() for x in PO_detail['产品编号'].tolist()], 'Seasons'].tolist()
         color_EN = color_EN + PO_detail['英文品名'].tolist()
         color_CN = color_CN + PO_detail['中文品名'].tolist()
         Remain_Pc = Remain_Pc + PO_detail['订单总数量'].tolist()
@@ -206,9 +202,9 @@ for i in POn:
             print('No Wholesaler')
             WS_POplan = WS_POplan + [' ' * PO_detail.shape[0]]
             WS_Remain_Pc = WS_Remain_Pc + [' ' * PO_detail.shape[0]]
-            
+    
     detail = pd.DataFrame({'TotalPO': TotalPO, 'Name': '', 'SKU': SKU, 'seasons': Seasons, 'color_EN': color_EN, 'color_CN': color_CN, 'Remain_Pc': Remain_Pc, 'Remain_percent': format(1,'.1%')})
-    subtotal = pd.DataFrame({'PO': [i], 'CAT': [cat], 'Season': [season], 'Factory': [fac], 'Total': [detail['TotalPO'].sum()], 'Name': [name]})
+    subtotal = pd.DataFrame({'PO': [i], 'CAT': [cat], 'Season': [season], 'Factory': [fac], 'Total': [detail['TotalPO'].sum()], 'Name': [name], 'SKU': '', 'seasons': '', 'color_EN': '', 'color_CN': '', 'Remain_Pc': total, 'Remain_percent': format(1,'.1%')})
     with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
         subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = 0, header = None, index = False)
         detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = Detail_c, header = None, index = False)
