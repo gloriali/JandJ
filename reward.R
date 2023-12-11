@@ -23,6 +23,7 @@ transactions <- read.csv("../Square/transactions-2023-11-09-2023-11-17.csv", as.
   filter(Customer.ID != "")
 point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected)))) %>% filter(Points != 0)
 write.csv(point, file = paste0("../yotpo/", format(Sys.Date(), "%m%d%Y"), "-yotpo.csv"), row.names = F)
+# upload to Yotpo
 
 ## --------------- Combine Error reports --------------
 library(dplyr)

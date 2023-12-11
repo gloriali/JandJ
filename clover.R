@@ -16,6 +16,7 @@ clover_item <- readWorkbook(clover, "Items") %>%
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
+# upload to Clover > Inventory
 
 # ---------------- request stock from Surrey warehouse --------------------
 # download current Surrey stock: xoro > Item Inventory Snapshot > Export all - csv; 
@@ -36,6 +37,7 @@ request <- c("BCV", "WPF", "WJA") # categories to restock
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
 order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
+# email Shikshit
 
 # -------- master file barcode for clover_item -------------
 # master SKU file: OneDrive > TWK 2020 share
@@ -50,6 +52,7 @@ clover_item <- readWorkbook(clover, "Items") %>% mutate(Product.Code = mastersku
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
+# upload to Clover > Inventory
 
 # -------- Black Friday sales price -------- 
 # download current woo price: wc > Products > All Products > Export.

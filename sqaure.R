@@ -20,3 +20,4 @@ square[sales$SKU, "Price"] <- sales[sales$SKU, "Sale.price"]
 square$PriceRichmond <- square$Price
 square$PriceSurrey <- square$Price
 write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), sep = ",", row.names = F, col.names = c(colnames(square)[1:ncol(square)-1], "Tax-PST(7%)"), na = "")
+# upload to Square > Items
