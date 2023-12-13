@@ -3,11 +3,11 @@
 # customer info: Clover > Customers > Download
 # sales: Clover > Transactions > Payments > select dates > Export
 library(dplyr)
-customer <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Customers-", format(Sys.Date(), "%Y%m%d")))), as.is = T) %>%
+customer <- read.csv(list.files(path = "../Clover/", pattern = paste0("Customers-", format(Sys.Date(), "%Y%m%d")), full.names = T), as.is = T) %>%
   mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "")
 rownames(customer) <- customer$Name
 
-payments <- read.csv(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")))), as.is = T) %>% 
+payments <- read.csv(list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")), full.names = T), as.is = T) %>% 
   mutate(email = customer[Customer.Name, "Email.Address"])
 payments[is.na(payments$Refund.Amount), "Refund.Amount"] <- 0
 payments <- payments %>% filter(!is.na(email))
