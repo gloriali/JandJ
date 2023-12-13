@@ -10,3 +10,4 @@
 [POtracking.ipynb](./POtracking.ipynb): track China to global shipping PO python Jupyter Notebook. - not updated, use python script in RStudio.    
 [POtracking.R](./POtracking.R): track China to global shipping PO. - discard, use python instead.   
 [FBArefill.R](./FBArefill.R): calculate FBA refill quantity for each SKU - run routinely and send to Shikshit.   
+[listing.R](./listing.R): create and manage listing files - generate at request.  
