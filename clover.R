@@ -5,14 +5,11 @@
 library(dplyr)
 library(openxlsx)
 woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
-  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price))
 rownames(woo) <- woo$SKU
-sales <- woo %>% filter(!is.na(Sale.price)) 
-rownames(sales) <- sales$SKU
 
 clover <- loadWorkbook(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"))))
-clover_item <- readWorkbook(clover, "Items") %>%
-  mutate(Price = ifelse(Name %in% sales$SKU, sales[Name, "Sale.price"], woo[Name, "Regular.price"]))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = woo[Name, "Sale.price"])
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
@@ -25,7 +22,6 @@ library(dplyr)
 library(openxlsx)
 xoro <- read.csv(paste0("../xoro/", list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"))), as.is = T) %>% filter(Store == "Warehouse - JJ")
 rownames(xoro) <- xoro$Item.
-
 clover <- loadWorkbook(paste0("../Clover/", list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"))))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name))
 clover_item[is.na(clover_item$Quantity) | clover_item$Quantity < 0, "Quantity"] <- 0

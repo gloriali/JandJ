@@ -21,9 +21,8 @@ write.csv(offline, file = paste0("../SKUmanagement/offline_", Sys.Date(), ".csv"
 
 # ------------- move to website deals page -------------
 woo <- read.csv(paste0("../woo/", list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))))), as.is = T) %>% 
-  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") 
-sales <- woo %>% filter(!is.na(Sale.price)) %>% mutate(discount = (Regular.price-Sale.price)/Regular.price)
-rownames(sales) <- sales$SKU
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price), discount = (Regular.price - Sale.price)/Regular.price)
+rownames(woo) <- woo$SKU
 xoro_lastmonth <- read.csv("../xoro/Item Inventory Snapshot_11102023.csv", as.is = T) %>% filter(Store == "Warehouse - JJ") 
 rownames(xoro_lastmonth) <- xoro_lastmonth$Item.
 JJ_month_ratio <- read.xlsx("../FBArefill/Historic sales and inv. data for all cats v29 (20231205).xlsx", sheet = "MonSaleR", startRow = 2, cols = c(1, 26:37)) %>% filter(!is.na(Category)) 
@@ -35,7 +34,7 @@ rownames(sizes_all) <- sizes_all$cat_print
 size_limited <- xoro %>% filter(!grepl(new_season, seasons) & ATS > qty_offline) %>% count(cat_print) %>% mutate(all = sizes_all[cat_print, "n"], percent = (all - n)/all) %>% filter(percent >= size_percent & percent < 1)
 rownames(size_limited) <- size_limited$cat_print
 deals <- xoro %>% mutate(lastmonth = xoro_lastmonth[Item., "ATS"], cat = gsub("-.*", "", Item.), threshold = ifelse(cat %in% JJ_month_ratio$Category, qty_sold*JJ_month_ratio[cat, "monthR"], ifelse(grepl(in_season, seasons), 8, 2))) %>% filter(cat_print %in% size_limited$cat_print & !grepl(new_season, seasons) & ATS > qty_offline & lastmonth - ATS < threshold & lastmonth - ATS > 0) %>% 
-  mutate(size_percent = percent(size_limited[cat_print, "percent"]), discount = percent(ifelse(Item. %in% sales$SKU, sales[Item., "discount"], 0), accuracy = 0.1)) %>% arrange(Item.)
+  mutate(size_percent = percent(size_limited[cat_print, "percent"]), discount = percent(woo[Item., "discount"], accuracy = 0.1)) %>% arrange(Item.)
 write.csv(deals, file = paste0("../SKUmanagement/deals_", Sys.Date(), ".csv"), row.names = F, na = "")
 # email Joren and Kamer
 
