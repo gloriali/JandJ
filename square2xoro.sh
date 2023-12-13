@@ -1,5 +1,7 @@
 #!/bin/sh
 # convert square sales report to xoro upload format
+## Square website > Transactions > Export Items Detail CSV;
+## Square website > Customers > Export Customers
 
 cd ~/OneDrive\ -\ Jan\ and\ Jul/TWK\ -\ Gloria/Square/
 items=$(ls items-$(date +%Y-%m-%d)*.csv); # Square website > Transactions > Export Items Detail CSV;
