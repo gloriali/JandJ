@@ -14,7 +14,7 @@ rownames(woo) <- woo$SKU
 products_XHS <- read.xlsx(list.files(path = "../Listing/LittleRedBook/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheet = 1)
 
 ### -------- update inventory with xoro ----------------
-products_XHS$Inventory <- ifelse(xoro[products_XHS$SKU, "ATS"] < 20, 0, xoro[products_XHS$SKU, "ATS"])
+products_XHS <- products_XHS %>% mutate(Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"]), Price = round(woo[SKU, "Sale.price"]/woo[SKU, "Regular.price"]*as.numeric(Compare.At.Price), digits = 2), Tags = ifelse(woo[SKU, "Sale.price"] == woo[SKU, "Regular.price"], "正价", "特价"))
 colnames(products_XHS) <- gsub("\\.", " ", colnames(products_XHS))
 write.xlsx(products_XHS, file = paste0("../Listing/LittleRedBook/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
 
