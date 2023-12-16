@@ -12,18 +12,25 @@ rownames(xoro) <- xoro$Item.
 woo <- read.csv(list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y"))), ".*.csv"), full.names = T)) %>% 
   mutate(SKU = toupper(SKU), Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "")
 rownames(woo) <- woo$SKU
+products_description <- read.xlsx("../Listing/XHS/products_description.xlsx", sheet = 1)
+rownames(products_description) <- products_description$SPU
 products_XHS <- read.xlsx2(list.files(path = "../Listing/XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 
-### -------- update inventory with xoro, price with woo ----------------
+### -------- update inventory with xoro, price with woo, product description ----------------
 products_upload <- products_XHS %>% mutate(Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"]), Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
+products_upload <- products_upload %>% mutate(Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../Listing/XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
 
-### -------- extract Existing descriptions -----------------
+### -------- extract and update existing descriptions -----------------
 products_description <- products_XHS %>% filter(!duplicated(SPU)) %>% mutate(SPU = toupper(SPU), cat = gsub("-.*", "", SKU), Description = paste(Description, SEO.Description, Describe), Description = str_trim(gsub("NA", "", Description))) %>% select(SPU, Product.Name, cat, Description, Categories, Option1.Name, Image.Src)
 products_description_cat <- products_description %>% select(cat, Product.Name, Description, Categories, Option1.Name) %>% filter(!duplicated(cat)) %>% mutate(Product.Name = gsub("\\s?-\\s?\\w+$", "", Product.Name))
 write.xlsx(products_description, file = "../Listing/XHS/products_description.xlsx")
 write.xlsx(products_description_cat, file = "../Listing/XHS/products_description_categories.xlsx")
+products_description_cat <- openxlsx::read.xlsx("../Listing/XHS/products_description_categories.xlsx", sheet = 1)
+rownames(products_description_cat) <- products_description_cat$cat
+products_description <- products_description %>% mutate(Description = products_description_cat[cat, "Description"])
+write.xlsx(products_description, file = "../Listing/XHS/products_description.xlsx")
 
 ### -------- create new listing ------------------------
 new_season <- "24"
