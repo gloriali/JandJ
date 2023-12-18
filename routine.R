@@ -1,5 +1,6 @@
 # Routine tasks
 library(dplyr)
+library(stringr)
 library(openxlsx)
 
 # input: woo > Products > All Products > Export > all
@@ -117,3 +118,20 @@ qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(Inv_clov
   filter(!grepl(new_season, Seasons.SKU) & MSKU.Status == "Active" & Inv_clover == 0 & Inv_Total_EndWK == 0)
 write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
+
+# -------- prepare to generate barcode: at request ------------
+POn <- "P257"
+startRow <- 9
+mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
+rownames(mastersku) <- mastersku$MSKU
+barcode <- read.xlsx(list.files(path = "../../TWK 2020 share/twk general/1-orders (formerly upcoming shipments)/", pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T), sheet = 1, startRow = startRow, cols = readcols) %>% select(SKU, Design.Version) %>% 
+  mutate(SKU = str_trim(SKU), Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = mastersku[SKU, "UPC.Active"]) %>% filter(SKU != "", !is.na(SKU))
+write.xlsx(barcode, file = paste0("../Clover/barcode", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+# Email Shirley
+clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- readWorkbook(clover, "Items")  # add new SKUs
+
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+writeData(clover, "Items", clover_item)
+saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
+
