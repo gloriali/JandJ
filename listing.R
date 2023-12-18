@@ -12,7 +12,7 @@ rownames(xoro) <- xoro$Item.
 woo <- read.csv(list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y"))), ".*.csv"), full.names = T)) %>% 
   mutate(SKU = toupper(SKU), Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "")
 rownames(woo) <- woo$SKU
-products_description <- read.xlsx("../Listing/XHS/products_description.xlsx", sheet = 1)
+products_description <- read.xlsx2("../Listing/XHS/products_description.xlsx", sheetIndex = 1)
 rownames(products_description) <- products_description$SPU
 products_XHS <- read.xlsx2(list.files(path = "../Listing/XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 
@@ -35,13 +35,13 @@ write.xlsx(products_description, file = "../Listing/XHS/products_description.xls
 ### -------- create new listing ------------------------
 new_season <- "24"
 categories <- c("UG1", "UJ1", "USA", "UT1", "UV2", "UVS")
-mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(mastersku$Category.SKU, mastersku$Print.SKU, sep = "-"))
+mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(mastersku$Category.SKU, mastersku$Print.SKU, sep = "-"))
 rownames(mastersku) <- mastersku$MSKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
 woo_cat <- woo %>% filter(!duplicated(cat)) 
 rownames(woo_cat) <- woo_cat$cat
 
-products_description_cat <- read.xlsx("../Listing/XHS/products_description_categories.xlsx", sheet = 1)
+products_description_cat <- read.xlsx2("../Listing/XHS/products_description_categories.xlsx", sheetIndex = 1)
 rownames(products_description_cat) <- products_description_cat$cat
 products_description_cat <- rbind(products_description_cat, data.frame(cat = categories) %>% mutate(Product.Name = woo_cat[cat, "Name"], Description = "", Categories = "", Option1.Name = woo_cat[cat, "Attribute.1.name"]))
 write.xlsx(products_description_cat, file = "../Listing/XHS/products_description_categories.xlsx")
