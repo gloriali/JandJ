@@ -55,6 +55,19 @@ writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
 # upload to Clover > Inventory
 
+# -------- Inventory recount -------- 
+clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_qty <- readWorkbook(clover, "Items") %>% select(SKU, Quantity) %>% mutate(New_qty = "", cat = gsub("-.*", "", SKU), size = gsub("^\\w+-\\w+-", "", SKU)) %>% arrange(cat, size)
+write.xlsx(clover_qty, file = paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+# recount inventory
+clover_qty <- read.xlsx(paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+rownames(clover_qty) <- clover_qty$SKU
+clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Quantity = clover_qty[SKU, "New_qty"])
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+writeData(clover, "Items", clover_item)
+saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
+
 # -------- Black Friday sales price -------- 
 # download current woo price: wc > Products > All Products > Export.
 # download clover inventory: clover_item > Inventory > Items > Export.
