@@ -57,11 +57,12 @@ saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y
 
 # -------- Inventory recount -------- 
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_qty <- readWorkbook(clover, "Items") %>% select(SKU, Quantity) %>% mutate(New_qty = "", cat = gsub("-.*", "", SKU), size = gsub("^\\w+-\\w+-", "", SKU)) %>% arrange(cat, size)
+clover_qty <- readWorkbook(clover, "Items") %>% select(SKU, Quantity) %>% mutate(New_qty = "", cat = gsub("-.*", "", SKU), size = gsub("^\\w+-\\w+-", "", SKU)) %>% arrange(cat, size) %>% select(SKU, New_qty, Quantity)
 write.xlsx(clover_qty, file = paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
 # recount inventory
 clover_qty <- read.xlsx(paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
 rownames(clover_qty) <- clover_qty$SKU
+diff <- clover_qty[clover_qty$New_qty != clover_qty$Quantity, ]
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(Quantity = clover_qty[SKU, "New_qty"])
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))

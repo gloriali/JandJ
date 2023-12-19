@@ -121,7 +121,7 @@ qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(Inv_clov
 write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
-# -------- prepare to generate barcode image: at request ------------
+# -------- Prepare to generate barcode image: at request ------------
 library(dplyr)
 library(openxlsx)
 POn <- "P257"
@@ -133,7 +133,7 @@ barcode <- read.xlsx(list.files(path = "../../TWK 2020 share/twk general/1-order
 write.xlsx(barcode, file = paste0("../Clover/barcode", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
 # Email Shirley
 
-# -------- sync master file barcode with clover: at request -------------
+# -------- Sync master file barcode with clover: at request -------------
 # master SKU file: OneDrive > TWK 2020 share
 # download clover inventory: clover_item > Inventory > Items > Export.
 library(dplyr)
