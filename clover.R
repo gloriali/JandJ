@@ -1,6 +1,6 @@
 # Clover system management
-# -------- woo price for clover -------- 
-# download current woo price: wc > Products > All Products > Export.
+# -------- update clover with woo -------- 
+# download current woo: wc > Products > All Products > Export.
 # download clover inventory: clover_item > Inventory > Items > Export.
 library(dplyr)
 library(openxlsx)
@@ -9,7 +9,7 @@ woo <- read.csv(list.files(path = "../woo/", pattern = paste0("wc-product-export
 rownames(woo) <- woo$SKU
 
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = woo[Name, "Sale.price"])
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = woo[Name, "Sale.price"], Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo$Tax.class == "full", "GST+PST", "PST"))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
@@ -35,16 +35,21 @@ order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 # email Shikshit
 
-# -------- master file barcode for clover_item -------------
+# -------- sync master file barcode with clover_item -------------
 # master SKU file: OneDrive > TWK 2020 share
 # download clover inventory: clover_item > Inventory > Items > Export.
 library(dplyr)
 library(openxlsx)
+new_season <- "24"
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(Product.Code = mastersku[SKU, "UPC.Active"])
+new_items <- data.frame(Clover.ID = "", Name = mastersku[mastersku$MSKU.Status == "Active" & grepl(new_season, mastersku$Seasons) & !(mastersku$MSKU %in% clover_item$Name), "MSKU"]) %>%
+  mutate(Alternate.Name = "", Price = "", Price.Type = "Fixed", Price.Unit = NA, Tax.Rates = "GST", Cost = 0, Product.Code = mastersku[Name, "UPC.Active"], SKU = Name, Modifier.Groups = NA, Quantity = 0, Printer.Labels = NA, Hidden = "No", Non.revenue.item = "No")
+new_items <- new_items %>% rename_with(~ gsub("Non.revenue.item", "Non-revenue.item", colnames(new_items)))
+clover_item <- rbind(clover_item, new_items)
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
