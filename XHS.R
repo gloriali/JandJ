@@ -35,7 +35,7 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 
 ### -------- create new listing ------------------------
 new_season <- "24"
-categories <- c("UG1", "UJ1", "USA", "UT1", "UV2", "UVS")
+categories <- products_description_cat$cat
 mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-"))
 rownames(mastersku) <- mastersku$MSKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
@@ -54,12 +54,14 @@ products_description_cat <- read.xlsx2("../XHS/products_description_categories.x
 rownames(products_description_cat) <- products_description_cat$cat
 mastersku_SPU <- mastersku %>% filter(MSKU.Status == "Active", !duplicated(SPU))
 rownames(mastersku_SPU) <- mastersku_SPU$SPU
-new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"])
+new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
+  filter(!(SPU %in% toupper(products_XHS$SPU)))
 rownames(new_description) <- new_description$SPU
 
 new_listing <- data.frame(SKU = woo[woo$cat %in% categories, "SKU"]) %>% 
-  mutate(status = mastersku[SKU, "MSKU.Status"], seasons = mastersku[SKU, "Seasons"], SPU = mastersku[SKU, "SPU"], cat = mastersku[SKU, "Category.SKU"], s = paste(cat, gsub("[tyTY]", "", mastersku[SKU, "Size"]), sep = "_"), Product.Name = new_description[SPU, "Product.Name"], Description = new_description[SPU, "Description"], Vendor = "Jan & Jul", Categories = new_description[SPU, "Categories"], Option1.Name = new_description[SPU, "Option1.Name"], Option1.Value = mastersku[SKU, "Size"], Weight = woo[SKU, "Weight..g."], Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[SKU, "UPC.Active"], Image.Src = new_description[SPU, "Image.Src"], SEO.Product.Name = Product.Name, SEO.Description = Description, Weight.Unit = "g", Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"])) %>%
-  filter(status == "Active", SKU %in% xoro$Item., grepl(new_season, seasons) | Inventory > 0)  %>% select(-cat, -s, -status, -seasons)
+  mutate(status = mastersku[SKU, "MSKU.Status"], seasons = mastersku[SKU, "Seasons"], SPU = mastersku[SKU, "SPU"], cat = mastersku[SKU, "Category.SKU"], s = paste(cat, gsub("[tyTY]", "", mastersku[SKU, "Size"]), sep = "_"), Product.Name = new_description[SPU, "Product.Name"], Description = new_description[SPU, "Description"], Mobile.Description = Description, Vendor = "Jan & Jul", Categories = new_description[SPU, "Categories"], Option1.Name = new_description[SPU, "Option1.Name"], Option1.Value = mastersku[SKU, "Size"], Weight = woo[SKU, "Weight..g."], Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[SKU, "UPC.Active"], Image.Src = new_description[SPU, "Image.Src"], Image.Position = "", SEO.Product.Name = Product.Name, SEO.Description = Description, Variant.Image = "", Weight.Unit = "g", Cost.Price = "", Describe = "", Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"])) %>%
+  filter(status == "Active", SKU %in% xoro$Item., grepl(new_season, seasons) | Inventory > 0, SPU %in% new_description$SPU)  %>% 
+  select(SPU, Product.Name, Description, Mobile.Description, Vendor, Categories, Tags, Option1.Name, Option1.Value, SKU, Weight, Price, Compare.At.Price, Requires.Shipping, Taxable, Barcode, Image.Src, Image.Position, SEO.Product.Name, SEO.Description, Variant.Image, Weight.Unit, Cost.Price, Inventory, Describe)
 colnames(new_listing) <- gsub("\\.", " ", colnames(new_listing))
 openxlsx::write.xlsx(new_listing, file = paste0("../XHS/new_listing-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
 # upload to AllValue > Products > change status to "Listed". All Value > Little Red Book Applet > Products management > Add promotional product > Select categories
