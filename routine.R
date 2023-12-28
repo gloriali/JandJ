@@ -13,10 +13,11 @@ rownames(xoro) <- xoro$Item.
 
 # -------- Sync XHS price to woo; inventory to xoro: Mon Wed Fri ----------------
 # input: AllValue > Products > Export > All products
-products_XHS <- read.xlsx(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheet = 1)
+library(xlsx)
+products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 products_upload <- products_XHS %>% mutate(Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"]), Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
-write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
+openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
 # upload to AllValue > Products
 
 # -------- Sync Square price to woo; inventory to xoro: weekly -------------
