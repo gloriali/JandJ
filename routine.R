@@ -5,7 +5,7 @@ library(openxlsx)
 
 # input: woo > Products > All Products > Export > all
 # input: xoro > Item Inventory Snapshot > Export all
-woo <- read.csv(list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))), full.names = T), as.is = T) %>% 
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price))
 rownames(woo) <- woo$SKU
 xoro <- read.csv(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"), full.names = T), as.is = T) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.))
@@ -28,11 +28,11 @@ write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"
 
 # -------- Sync Clover to woo: weekly -------------
 # input Clover > Inventory > Items > Export.
-clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = woo[Name, "Sale.price"], Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo$Tax.class == "full", "GST+PST", "PST"))
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], ""), Price.Type = ifelse(Name %in% woo$SKU, "Fixed", "Variable"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST")) 
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
-saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
 
 # -------- Add POS sales to yotpo rewards program: weekly -----------
