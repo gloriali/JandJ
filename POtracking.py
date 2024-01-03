@@ -1,5 +1,5 @@
 # combine PO files and shipping info into PO tracking file
-season = "2024SS"
+season = "2024FW"
 
 # ------ write header for new Shipment Tracking.xlsx file ------
 from openpyxl import Workbook
@@ -108,11 +108,12 @@ factory["id"] = factory.index
 factory = pd.melt(factory, id_vars = "id")
 factory = factory.dropna(axis = 0, how = "any")
 factory = pd.Series(factory.variable.values, index = factory.value).to_dict()
-masterSKU = pd.read_excel(glob(os.path.join("../../TWK 2020 share/1-MasterSKU-All-Product-" + "*.xlsx"))[-1], sheet_name = 0, skiprows = 1, header = 2, index_col = 9, usecols = "B:M", engine = "openpyxl")
-masterSKU = masterSKU.set_index(pd.Index(x.upper() for x in masterSKU.index))
+masterSKU = pd.read_excel(glob(os.path.join("../../TWK 2020 share/1-MasterSKU-All-Product-" + "*.xlsx"))[-1], sheet_name = 0, skiprows = 1, header = 2, usecols = "B:M", engine = "openpyxl")
+masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
+masterSKU = pd.Series(masterSKU.Seasons.values, index = masterSKU.MSKU).to_dict()
 
 ## input PO files
-POn = ["P" + str(n) for n in range(257, 288)]
+POn = ["P" + str(n) for n in range(341, 343)]
 for i in POn:
   print(i)
   POtrack1 = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")[season]
@@ -157,13 +158,14 @@ for i in POn:
     if total != PO_detail['订单总数量'].sum(): 
       print('ERROR: Total in Pcs does not match.', total, PO_detail['订单总数量'].sum())
       break
+    
     cat_list = list(dict.fromkeys(PO_detail['产品编号'].replace('-.*', '', regex = True).tolist()))
     fac_list = list(dict.fromkeys([factory[x] for x in cat_list]))
     cat = cat + ' '.join(cat_list)
     fac = fac + ' '.join(fac_list)
     TotalPO = TotalPO + PO_detail['订单总数量'].tolist()
     SKU = SKU + PO_detail['产品编号'].tolist()
-    Seasons = Seasons + masterSKU.loc[[x.upper() for x in PO_detail['产品编号'].tolist()], 'Seasons'].tolist()
+    Seasons = Seasons + [masterSKU.get(x.upper(), "NaN") for x in PO_detail['产品编号']] 
     color_EN = color_EN + PO_detail['英文品名'].tolist()
     color_CN = color_CN + PO_detail['中文品名'].tolist()
     Remain_Pc = Remain_Pc + PO_detail['订单总数量'].tolist()
@@ -174,6 +176,7 @@ for i in POn:
       print('No CA/US')
       CA_POplan = CA_POplan + [' ' * PO_detail.shape[0]]
       CA_Remain_Pc = CA_Remain_Pc + [' ' * PO_detail.shape[0]]
+    
     try: 
       UK_POplan = UK_POplan + PO_detail.iloc[:, UK_PO_c-SKU_c].tolist()
       UK_Remain_Pc = UK_Remain_Pc + PO_detail.iloc[:, UK_PO_c-SKU_c].tolist()
@@ -181,6 +184,7 @@ for i in POn:
       print('No UK')
       UK_POplan = UK_POplan + [' ' * PO_detail.shape[0]]
       UK_Remain_Pc = UK_Remain_Pc + [' ' * PO_detail.shape[0]]
+    
     try: 
       DE_POplan = DE_POplan + PO_detail.iloc[:, DE_PO_c-SKU_c].tolist()
       DE_Remain_Pc = DE_Remain_Pc + PO_detail.iloc[:, DE_PO_c-SKU_c].tolist()
@@ -188,6 +192,7 @@ for i in POn:
       print('No DE')
       DE_POplan = DE_POplan + [' ' * PO_detail.shape[0]]
       DE_Remain_Pc = DE_Remain_Pc + [' ' * PO_detail.shape[0]]
+    
     try: 
       CN_POplan = CN_POplan + PO_detail.iloc[:, CN_PO_c-SKU_c].tolist()
       CN_Remain_Pc = CN_Remain_Pc + PO_detail.iloc[:, CN_PO_c-SKU_c].tolist()
@@ -195,6 +200,7 @@ for i in POn:
       print('No CN')
       CN_POplan = CN_POplan + [' ' * PO_detail.shape[0]]
       CN_Remain_Pc = CN_Remain_Pc + [' ' * PO_detail.shape[0]]
+    
     try: 
       WS_POplan = WS_POplan + PO_detail.iloc[:, WS_PO_c-SKU_c].tolist()
       WS_Remain_Pc = WS_Remain_Pc + PO_detail.iloc[:, WS_PO_c-SKU_c].tolist()
@@ -208,26 +214,31 @@ for i in POn:
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
     subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = 0, header = None, index = False)
     detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = Detail_c, header = None, index = False)
+  
   CA_detail = pd.DataFrame({'POplan': CA_POplan, 'Remain_Pc': CA_Remain_Pc, 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in CA_POplan) else format(1,'.1%')})
   CA_subtotal = pd.DataFrame({'POplan': [CA_detail['POplan'].sum()], 'Remain_Pc': [CA_detail['Remain_Pc'].sum()], 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in CA_POplan) else format(1,'.1%')})
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
     CA_subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = CA_c, header = None, index = False)
     CA_detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = CA_c, header = None, index = False)
+  
   UK_detail = pd.DataFrame({'POplan': UK_POplan, 'Remain_Pc': UK_Remain_Pc, 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in UK_POplan) else format(1,'.1%')})
   UK_subtotal = pd.DataFrame({'POplan': [UK_detail['POplan'].sum()], 'Remain_Pc': [UK_detail['Remain_Pc'].sum()], 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in UK_POplan) else format(1,'.1%')})
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
     UK_subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = UK_c, header = None, index = False)
     UK_detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = UK_c, header = None, index = False)
+  
   DE_detail = pd.DataFrame({'POplan': DE_POplan, 'Remain_Pc': DE_Remain_Pc, 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in DE_POplan) else format(1,'.1%')})
   DE_subtotal = pd.DataFrame({'POplan': [DE_detail['POplan'].sum()], 'Remain_Pc': [DE_detail['Remain_Pc'].sum()], 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in DE_POplan) else format(1,'.1%')})
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
     DE_subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = DE_c, header = None, index = False)
     DE_detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = DE_c, header = None, index = False)
+  
   CN_detail = pd.DataFrame({'POplan': CN_POplan, 'Remain_Pc': CN_Remain_Pc, 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in CN_POplan) else format(1,'.1%')})
   CN_subtotal = pd.DataFrame({'POplan': [CN_detail['POplan'].sum()], 'Remain_Pc': [CN_detail['Remain_Pc'].sum()], 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in CN_POplan) else format(1,'.1%')})
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
     CN_subtotal.to_excel(writer, sheet_name = season, startrow = PO_r, startcol = CN_c, header = None, index = False)
     CN_detail.to_excel(writer, sheet_name = season, startrow = PO_r+1, startcol = CN_c, header = None, index = False)
+  
   WS_detail = pd.DataFrame({'POplan': WS_POplan, 'Remain_Pc': WS_Remain_Pc, 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in WS_POplan) else format(1,'.1%')})
   WS_subtotal = pd.DataFrame({'POplan': [WS_detail['POplan'].sum()], 'Remain_Pc': [WS_detail['Remain_Pc'].sum()], 'Remain_percent': '' if all(s == '' or str(s).isspace() for s in WS_POplan) else format(1,'.1%')})
   with pd.ExcelWriter("../PO/" + season + " China to Global Shipment Tracking.xlsx", if_sheet_exists = 'overlay', mode = 'a') as writer:
