@@ -113,7 +113,7 @@ masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
 masterSKU = pd.Series(masterSKU.Seasons.values, index = masterSKU.MSKU).to_dict()
 
 ## input PO files
-POn = ["P" + str(n) for n in range(341, 343)]
+POn = ["P" + str(n) for n in range(292, 343)]
 for i in POn:
   print(i)
   POtrack1 = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")[season]
