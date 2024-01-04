@@ -31,11 +31,14 @@ write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"
 
 # -------- Sync Clover to woo: weekly -------------
 # input Clover > Inventory > Items > Export.
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], ""), Price.Type = ifelse(Name %in% woo$SKU, "Fixed", "Variable"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST")) 
-clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
-writeData(clover, "Items", clover_item)
+price <- woo %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
+rownames(price) <- price$cat
+clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+clover_item <- readWorkbook(clover, "Items") %>% filter(!is.na(Name), !duplicated(Name)) %>% 
+  mutate(cat = toupper(gsub("-.*", "", SKU)), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST"), Tax.Rates = ifelse(is.na(Tax.Rates), "GST", Tax.Rates)) %>% select(-cat)
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+openxlsx::write.xlsx(clover_item, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), sheetName = "Items", overwrite = T)
 # upload to Clover > Inventory
 
 # -------- Add POS sales to yotpo rewards program: weekly -----------
@@ -62,11 +65,11 @@ write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.nam
 
 # -------- Request stock from Surrey: at request --------------------
 # input Clover > Inventory > Items > Export.
-request <- c("BCV", "WPF", "WJA") # categories to restock
+request <- c("BTB", "SKX", "WJA") # categories to restock
 n <- 1       # Qty per SKU to stock at Richmond
 n_xoro <- 10 # min Qty in stock at Surrey to request
-clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name))
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name)) %>% filter(!duplicated(Name), !is.na(Name))
 clover_item[is.na(clover_item$Quantity) | clover_item$Quantity < 0, "Quantity"] <- 0
 rownames(clover_item) <- clover_item$Name
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
