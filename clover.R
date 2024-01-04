@@ -56,15 +56,24 @@ saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y
 # upload to Clover > Inventory
 
 # -------- Inventory recount -------- 
+library(dplyr)
+library(openxlsx)
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_qty <- readWorkbook(clover, "Items") %>% select(SKU, Quantity) %>% mutate(New_qty = "", cat = gsub("-.*", "", SKU), size = gsub("^\\w+-\\w+-", "", SKU)) %>% arrange(cat, size) %>% select(SKU, New_qty, Quantity)
 write.xlsx(clover_qty, file = paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
 # recount inventory
-clover_qty <- read.xlsx(paste0("../Clover/recount_inventory-", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+clover_qty1 <- read.xlsx("../Clover/recount_inventory-20231219.xlsx", sheet = 1, skipEmptyCols = T) %>% mutate(qty_1 = ifelse(is.na(New_qty) | New_qty == "", 0, as.numeric(New_qty)))
+clover_qty_g <- read.xlsx("../Clover/recount_inventory-20240103gloria.xlsx", sheet = 1, skipEmptyCols = T) %>% mutate(qty_g = ifelse(is.na(New_qty) | New_qty == "", 0, as.numeric(New_qty)))
+clover_qty_m <- read.xlsx("../Clover/recount_inventory-20240103minranda.xlsx", sheet = 1, skipEmptyCols = T) %>% mutate(qty_m = ifelse(is.na(New_qty) | New_qty == "", 0, as.numeric(New_qty)))
+clover_qty_s <- read.xlsx("../Clover/recount_inventory-20240102shirley.xlsx", sheet = 1, skipEmptyCols = T) %>% mutate(qty_s = ifelse(is.na(New_qty) | New_qty == "", 0, as.numeric(New_qty)))
+clover_qty <- merge(merge(clover_qty1, clover_qty_g, by = "SKU"), merge(clover_qty_m, clover_qty_s, by = "SKU"), by = "SKU") %>%
+  mutate(Quantity = Quantity.x.x, New_qty = qty_g + qty_m + qty_s - qty_1 * 2) %>% select(SKU, Quantity, New_qty)
+diff <- clover_qty[clover_qty$New_qty != clover_qty$Quantity, ] %>% arrange(desc(abs(Quantity-New_qty)))
+write.csv(clover_qty, file = "../Clover/recount_inventory-20240103_final.csv", row.names = F, quote = F)
+clover_qty <- read.xlsx("../Clover/recount_inventory-20240103_final.xlsx", sheet = 1)
 rownames(clover_qty) <- clover_qty$SKU
-diff <- clover_qty[clover_qty$New_qty != clover_qty$Quantity, ]
 clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(Quantity = clover_qty[SKU, "New_qty"])
+clover_item <- readWorkbook(clover, "Items") %>% mutate(Quantity = clover_qty[SKU, "qty"])
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 writeData(clover, "Items", clover_item)
 saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"))
