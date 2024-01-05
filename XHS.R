@@ -35,7 +35,7 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 
 ### -------- create new listing ------------------------
 new_season <- "24"
-categories <- c("ACA")
+categories <- subset(unique(woo$cat), !(unique(woo$cat) %in% products_description$cat))
 mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-"))
 rownames(mastersku) <- mastersku$MSKU
 catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU-category", fillMergedCells = T) %>% filter(!duplicated(SKU))
@@ -45,6 +45,7 @@ rownames(image) <- image$SKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
 
 #### description and details for the new listing
+products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1)
 rownames(products_description_cat) <- products_description_cat$cat
 products_description_cat <- rbind(products_description_cat, data.frame(cat = categories) %>% mutate(Product.Name = catprint[cat, "Style.Name"], Description = "", Categories = catprint[cat, "Product.Category"], Option1.Name = "Size"))
