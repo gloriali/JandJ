@@ -86,6 +86,8 @@ in_season <- "F"     # "F": Sept - Feb; "S": Mar - Aug
 qty_offline <- 3     # Qty to move to offline sales
 qty_sold <- 50       # Sales rate low: base Qty sold on website last month
 size_percent <- 0.5  # % of sizes not available 
+f <- "../FBArefill/Historic sales and inv. data for all cats v31 (20240104).xlsx"
+f1 <- "../xoro/Item Inventory Snapshot_12012023.csv"
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 xoro <- read.csv(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"), full.names = T), as.is = T) %>% filter(Store == "Warehouse - JJ") %>% 
@@ -96,13 +98,13 @@ offline <- xoro %>% filter(!grepl(new_season, seasons) & ATS <= qty_offline & AT
 write.csv(offline, file = paste0("../SKUmanagement/offline_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 ## suggest to website deals page 
-woo <- read.csv(list.files(path = "../woo/", pattern = paste0("wc-product-export-", sub("-0", "", sub("^0", "", format(Sys.Date(), "%d-%m-%Y")))), full.names = T), as.is = T) %>% 
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price), discount = (Regular.price - Sale.price)/Regular.price)
 rownames(woo) <- woo$SKU
-xoro_lastmonth <- read.csv("../xoro/Item Inventory Snapshot_11102023.csv", as.is = T) %>% filter(Store == "Warehouse - JJ") 
+xoro_lastmonth <- read.csv(f1, as.is = T) %>% filter(Store == "Warehouse - JJ") 
 rownames(xoro_lastmonth) <- xoro_lastmonth$Item.
-JJ_month_ratio <- read.xlsx("../FBArefill/Historic sales and inv. data for all cats v29 (20231205).xlsx", sheet = "MonSaleR", startRow = 2, cols = c(1, 26:37)) %>% filter(!is.na(Category)) 
-JJ_month_ratio <- JJ_month_ratio %>% mutate(monthR = as.integer(format(Sys.Date(), "%d"))/31*JJ_month_ratio[, gsub("0", "", format(Sys.Date(), "%m"))] + (31 - as.integer(format(Sys.Date(), "%d")))/31*JJ_month_ratio[, as.integer(format(Sys.Date(), "%m"))])
+JJ_month_ratio <- read.xlsx(f, sheet = "MonSaleR", startRow = 2, cols = c(1, 26:37)) %>% filter(!is.na(Category)) 
+JJ_month_ratio <- JJ_month_ratio %>% mutate(monthR = as.integer(format(Sys.Date(), "%d"))/31*JJ_month_ratio[, gsub("0", "", format(Sys.Date(), "%m"))] + (31 - as.integer(format(Sys.Date(), "%d")))/31*JJ_month_ratio[, as.character(as.integer(format(Sys.Date(), "%m"))-1)])
 rownames(JJ_month_ratio) <- JJ_month_ratio$Category
 sizes_all <- xoro %>% mutate(cat_print_size = gsub("(\\w+-\\w+-\\w+).*", "\\1", Item.)) %>% filter(!duplicated(cat_print_size)) %>% count(cat_print)
 rownames(sizes_all) <- sizes_all$cat_print
@@ -113,12 +115,12 @@ deals <- xoro %>% mutate(lastmonth = xoro_lastmonth[Item., "ATS"], cat = gsub("-
 write.csv(deals, file = paste0("../SKUmanagement/deals_", Sys.Date(), ".csv"), row.names = F, na = "")
 # email Joren and Kamer
 ## to inactivate 
-clover <- read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items")
+clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(!duplicated(Name), !is.na(Name))
 rownames(clover) <- clover$SKU
-names <- grep("-WK", getSheetNames("../FBArefill/Historic sales and inv. data for all cats v29 (20231205).xlsx"), value = T)
+names <- grep("-WK", getSheetNames(f), value = T)
 inventory <- data.frame()
 for(name in names){
-  cat_inventory <- read.xlsx("../FBArefill/Historic sales and inv. data for all cats v29 (20231205).xlsx", sheet = name, startRow = 2)
+  cat_inventory <- openxlsx::read.xlsx(f, sheet = name, startRow = 2)
   inventory <- rbind(inventory, cat_inventory)
 }
 inventory_s <- inventory %>% count(Adjust_MSKU, wt = Inv_Total_End.WK)
