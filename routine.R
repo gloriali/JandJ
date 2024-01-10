@@ -133,14 +133,15 @@ write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(),
 # -------- Prepare to generate barcode image: at request ------------
 library(dplyr)
 library(openxlsx)
-POn <- "P257"
+season <- "24F"
+POn <- "P292"
 folder <- "AHJ-Adult Juniper Hat"
 startRow <- 9
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 barcode <- read.xlsx(list.files(path = "../../TWK 2020 share/twk general/1-orders (formerly upcoming shipments)/", pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T), sheet = 1, startRow = startRow, cols = readcols) %>% select(SKU, Design.Version) %>% 
   mutate(SKU = str_trim(SKU), Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = mastersku[SKU, "UPC.Active"], Image = "") %>% filter(SKU != "", !is.na(SKU))
-write.xlsx(barcode, file = paste0("../../TWK Product Labels/", folder, "/", folder, "-Barcode Labels.xlsx"))
+write.xlsx(barcode, file = paste0("../../TWK Product Labels/", folder, "/", season, "/", folder, "-Barcode Labels.xlsx"))
 
 # -------- Sync master file barcode with clover: at request -------------
 # master SKU file: OneDrive > TWK 2020 share
