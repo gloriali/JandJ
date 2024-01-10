@@ -114,6 +114,7 @@ masterSKU = pd.Series(masterSKU.Seasons.values, index = masterSKU.MSKU).to_dict(
 
 ## input PO files
 POn = ["P" + str(n) for n in range(292, 343)]
+PO_checklist = fac_checklist = cat_checklist = []
 for i in POn:
   print(i)
   POtrack1 = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")[season]
@@ -250,3 +251,13 @@ for i in POn:
   POtrack1.sheet_properties.outlinePr.summaryBelow = False
   POtrack1.row_dimensions.group(PO_r+2, PO_r+len(SKU)+1, outline_level = 1)
   POtrack.save("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+  
+  PO_checklist = PO_checklist + [i]
+  fac_checklist = fac_checklist + [fac]
+  cat_checklist = cat_checklist + [cat]
+
+checklist = pd.DataFrame({'Category': cat_checklist, 'Factory': fac_checklist, 'PO': PO_checklist})
+with pd.ExcelWriter("../PO/PreProduction_checklist.xlsx", mode = 'w') as writer:
+  checklist.to_excel(writer, sheet_name = 'checklist', header = None, index = False)
+
+
