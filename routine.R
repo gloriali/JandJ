@@ -134,15 +134,40 @@ write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(),
 # -------- Prepare to generate barcode image: at request ------------
 library(dplyr)
 library(openxlsx)
-season <- "24F"
-POn <- "P292"
-folder <- "AHJ-Adult Juniper Hat"
+library(stringr)
+season <- "2024FW"
 startRow <- 9
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
-barcode <- read.xlsx(list.files(path = "../../TWK 2020 share/twk general/1-orders (formerly upcoming shipments)/", pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T), sheet = 1, startRow = startRow, cols = readcols) %>% select(SKU, Design.Version) %>% 
-  mutate(SKU = str_trim(SKU), Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = mastersku[SKU, "UPC.Active"], Image = "") %>% filter(SKU != "", !is.na(SKU))
-write.xlsx(barcode, file = paste0("../../TWK Product Labels/", folder, "/", season, "/", folder, "-Barcode Labels.xlsx"))
+for(i in 292:342){
+  POn <- paste0("P", i)
+  if(!sum(grepl(POn, list.dirs(paste0("../PO/order/", season, "/"), recursive = F)))) next
+  print(POn)
+  file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T)
+  for(f in 1:length(file)){
+    barcode <- read.xlsx(file[f], sheet = 1, startRow = startRow) %>% select(SKU, Design.Version) %>% 
+      mutate(SKU = str_trim(SKU), Category = mastersku[SKU, "Category.SKU"], Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = gsub("/.*", "", mastersku[SKU, "UPC.Active"]), Image = "") %>% filter(SKU != "", !is.na(SKU))
+    barcode_split <- split(barcode, f = barcode$Category )
+    for(j in 1:length(barcode_split)){
+      barcode_j <- barcode_split[[j]]
+      cat <- barcode_j[1, "Category"]
+      dir <- grep(cat, list.dirs("../../TWK Product Labels/", recursive = F), value = T)
+      if(length(dir) == 0){
+        dir.create(paste0("../../TWK Product Labels/", cat, "/", season, "/"), recursive = T)
+        write.xlsx(barcode, file = paste0(paste0("../../TWK Product Labels/", cat, "/", season, "/"), POn, "_", cat, "-Barcode Labels.xlsx"))
+      }
+      else{
+        if(!sum(grepl("24F", list.dirs(dir, recursive = F)))){
+          dir.create(paste0(dir, "/", season, "/"))
+          write.xlsx(barcode, file = paste0(dir, "/", season, "/", POn, "_", cat, "-Barcode Labels.xlsx"))
+        }
+        else{
+          write.xlsx(barcode, file = paste0(grep("24F", list.dirs(dir, recursive = F), value = T), "/", POn, "_", cat, "-Barcode Labels.xlsx"))
+        }
+      }
+    }
+  }
+}
 
 # -------- Sync master file barcode with clover: at request -------------
 # master SKU file: OneDrive > TWK 2020 share
