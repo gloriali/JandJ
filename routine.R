@@ -2,18 +2,18 @@
 library(dplyr)
 library(stringr)
 library(openxlsx)
+library(xlsx)
 
 # input: woo > Products > All Products > Export > all
 # input: xoro > Item Inventory Snapshot > Export all
 woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price))
 rownames(woo) <- woo$SKU
-xoro <- read.csv(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"), full.names = T), as.is = T) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.))
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.))
 rownames(xoro) <- xoro$Item.
 
 # -------- Sync XHS price to woo; inventory to xoro: Mon Wed Fri ----------------
 # input: AllValue > Products > Export > All products
-library(xlsx)
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 rownames(products_description) <- products_description$SPU
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
@@ -134,13 +134,13 @@ write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(),
 library(dplyr)
 library(openxlsx)
 POn <- "P257"
+folder <- "AHJ-Adult Juniper Hat"
 startRow <- 9
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 barcode <- read.xlsx(list.files(path = "../../TWK 2020 share/twk general/1-orders (formerly upcoming shipments)/", pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T), sheet = 1, startRow = startRow, cols = readcols) %>% select(SKU, Design.Version) %>% 
   mutate(SKU = str_trim(SKU), Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = mastersku[SKU, "UPC.Active"], Image = "") %>% filter(SKU != "", !is.na(SKU))
-write.xlsx(barcode, file = paste0("../Clover/barcode", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
-# Email Shirley
+write.xlsx(barcode, file = paste0("../../TWK Product Labels/", folder, "/", folder, "-Barcode Labels.xlsx"))
 
 # -------- Sync master file barcode with clover: at request -------------
 # master SKU file: OneDrive > TWK 2020 share
