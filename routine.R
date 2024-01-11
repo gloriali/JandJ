@@ -149,7 +149,7 @@ for(i in 292:342){
     barcode <- read.xlsx(file[f], sheet = 1, startRow = startRow) %>% select(SKU, Design.Version, TOTAL.ORDER) %>% 
       mutate(SKU = str_trim(SKU), Category = mastersku[SKU, "Category.SKU"], Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = gsub("/.*", "", mastersku[SKU, "UPC.Active"]), Image = "") 
     qty0 <- rbind(qty0, barcode %>% filter(SKU != "", !is.na(SKU), grepl("NEW", Design.Version), TOTAL.ORDER == 0, !is.na(UPC.Active)))
-    barcode <- barcode %>% filter(SKU != "", !is.na(SKU), !(SKU %in% qty0$SKU))
+    barcode <- barcode %>% filter(SKU != "", !is.na(SKU), !(SKU %in% qty0$SKU)) %>% select(SKU, Print.English, Print.Chinese,	Category, Size, UPC.Active, Design.Version, Image)
     barcode_split <- split(barcode, f = barcode$Category )
     for(j in 1:length(barcode_split)){
       barcode_j <- barcode_split[[j]]
