@@ -140,6 +140,7 @@ startRow <- 9
 mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 qty0 <- data.frame()
+skus <- c()
 for(i in 292:342){
   POn <- paste0("P", i)
   if(!sum(grepl(POn, list.dirs(paste0("../PO/order/", season, "/"), recursive = F)))) next
@@ -147,9 +148,11 @@ for(i in 292:342){
   file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T)
   for(f in 1:length(file)){
     barcode <- read.xlsx(file[f], sheet = 1, startRow = startRow) %>% select(SKU, Design.Version, TOTAL.ORDER) %>% 
-      mutate(SKU = str_trim(SKU), Category = mastersku[SKU, "Category.SKU"], Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = gsub("/.*", "", mastersku[SKU, "UPC.Active"]), Image = "") 
-    qty0 <- rbind(qty0, barcode %>% filter(SKU != "", !is.na(SKU), grepl("NEW", Design.Version), TOTAL.ORDER == 0, !is.na(UPC.Active)))
-    barcode <- barcode %>% filter(SKU != "", !is.na(SKU), !(SKU %in% qty0$SKU)) %>% select(SKU, Print.English, Print.Chinese,	Category, Size, UPC.Active, Design.Version, Image)
+      mutate(SKU = str_trim(SKU), Category = mastersku[SKU, "Category.SKU"], Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = gsub("/.*", "", mastersku[SKU, "UPC.Active"]), Image = "") %>%
+      filter(SKU != "", !is.na(SKU))
+    skus <- c(skus, barcode[barcode$TOTAL.ORDER != 0, "SKU"])
+    qty0 <- rbind(qty0, barcode %>% filter(grepl("NEW", Design.Version), TOTAL.ORDER == 0, !is.na(UPC.Active)))
+    barcode <- barcode %>% filter(TOTAL.ORDER != 0) %>% select(SKU, Print.English, Print.Chinese,	Category, Size, UPC.Active, Design.Version, Image)
     barcode_split <- split(barcode, f = barcode$Category )
     for(j in 1:length(barcode_split)){
       barcode_j <- barcode_split[[j]]
@@ -171,6 +174,7 @@ for(i in 292:342){
     }
   }
 }
+qty0 <- qty0 %>% filter(!(SKU %in% skus))
 write.xlsx(qty0, file = "../../TWK Product Labels/SKU_new_qty0_UPC.xlsx", rowNames = F)
 
 # -------- Sync master file barcode with clover: at request -------------
