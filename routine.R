@@ -31,10 +31,10 @@ write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"
 
 # -------- Sync Clover to woo: weekly -------------
 # input Clover > Inventory > Items > Export.
-price <- woo %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
+price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
 rownames(price) <- price$cat
-clover <- loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% 
   mutate(cat = toupper(gsub("-.*", "", SKU)), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST"), Tax.Rates = ifelse(is.na(Tax.Rates), "GST", Tax.Rates)) %>% select(-cat)
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
