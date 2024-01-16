@@ -1,5 +1,23 @@
 # combine PO files and shipping info into PO tracking file
-season = "2024FW"
+season = "2024SS"
+
+# Function: Search value in dataframe, and find the next n non-empty cell
+def next_non_empty(df, value, dim, n):
+  mask = df.applymap(lambda x: str(value) in str(x)).to_numpy()
+  if mask.any():
+    r, c = np.argwhere(mask)[0]
+  else:
+    return df.shape[0]+1, df.shape[1]+1
+  if dim == "row":
+    for row in range(r+n, df.shape[0]):
+      if df.iloc[row, c] is not np.nan: 
+        return row, c
+        break
+  if dim == "col": 
+    for col in range(c+n, df.shape[1]):
+      if df.iloc[r, col] is not np.nan:
+        return r, col
+        break
 
 # ------ write header for new Shipment Tracking.xlsx file ------
 from openpyxl import Workbook
@@ -82,24 +100,6 @@ from glob import glob
 from openpyxl import Workbook
 from openpyxl import load_workbook
 
-## Function: Search value in dataframe, and find the next n non-empty cell
-def next_non_empty(df, value, dim, n):
-  mask = df.applymap(lambda x: str(value) in str(x)).to_numpy()
-  if mask.any():
-    r, c = np.argwhere(mask)[0]
-  else:
-    return df.shape[0]+1, df.shape[1]+1
-  if dim == "row":
-    for row in range(r+n, df.shape[0]):
-      if df.iloc[row, c] is not np.nan: 
-        return row, c
-        break
-  if dim == "col": 
-    for col in range(c+n, df.shape[1]):
-      if df.iloc[r, col] is not np.nan:
-        return r, col
-        break
-
 ## Factory code and master SKU
 factory = pd.read_excel("../../TWK 2020 share/1-MasterSKU_CatPrintsFactory.xlsx", sheet_name = 3, skiprows = 2, engine = "openpyxl")
 factory.drop(columns = ["Unnamed: 7", "Unnamed: 8", "Unnamed: 9", "Unnamed: 10"], inplace = True) 
@@ -113,7 +113,7 @@ masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
 masterSKU = pd.Series(masterSKU.Seasons.values, index = masterSKU.MSKU).to_dict()
 
 ## input PO files
-POn = ["P" + str(n) for n in range(292, 343)]
+POn = ["P" + str(n) for n in range(257, 288)]
 PO_checklist = fac_checklist = cat_checklist = []
 for i in POn:
   print(i)
@@ -257,7 +257,45 @@ for i in POn:
   cat_checklist = cat_checklist + [cat]
 
 checklist = pd.DataFrame({'Category': cat_checklist, 'Factory': fac_checklist, 'PO': PO_checklist})
-with pd.ExcelWriter("../PO/PreProduction_checklist.xlsx", mode = 'w') as writer:
+with pd.ExcelWriter("../PO/" + season + "_PreProduction_checklist.xlsx", mode = 'w') as writer:
   checklist.to_excel(writer, sheet_name = 'checklist', header = None, index = False)
 
+# ----------- input shipment -------------
+import pandas as pd
+import numpy as np
+import os
+import re
+from glob import glob
+from openpyxl import Workbook
+from openpyxl import load_workbook
 
+ship = "S1"
+insert_c = 17 # column number for shipment in tracking file
+remain_c = 15 # column number to deduct qty from in tracking file
+ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))[0]
+shipment = load_workbook(ship_f)
+sheets = shipment.get_sheet_names()
+sku_all = qty_all = PO_all = []
+for i in range(1, len(sheets)):
+  print(sheets[i])
+  shipment_i = pd.read_excel(ship_f, sheet_name = sheets[i], engine = "openpyxl", header = 0, usecols = "A:G", skiprows = 4).dropna(subset = ["SKU", "PO #"])
+  sku_all = sku_all + shipment_i["SKU"].to_list()
+  qty_all = qty_all + shipment_i["QTY SHIPPED"].to_list()
+  PO_all = PO_all + shipment_i["PO #"].to_list()
+
+shipment_all = pd.DataFrame({"PO": PO_all, "SKU": sku_all, "QTY": qty_all}).groupby(["PO", "SKU"]).sum().reset_index()
+shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
+
+POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+POtrack1 = POtrack[season]
+POtrack1.insert_cols(insert_c)
+POtrack1.cell(1, insert_c).value = ship
+POtrack1.cell(1, insert_c).alignment = center
+POtrack1.cell(4, insert_c).value = "SKU & Qty (Pcs)"
+POtrack1.cell(4, insert_c).font = Font(size = 11, bold = True)
+POtrack1.cell(4, insert_c).alignment = center
+POtrack1.cell(4, insert_c).fill = PatternFill("solid", fgColor = "00FFCC00")
+POtrack1.cell(4, insert_c).border = Border(top = thin, bottom = thin, left = thin, right = thin)
+
+
+POtrack.save("../PO/" + season + " China to Global Shipment Tracking1.xlsx")
