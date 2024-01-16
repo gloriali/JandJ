@@ -10,12 +10,12 @@ def next_non_empty(df, value, dim, n):
     return df.shape[0]+1, df.shape[1]+1
   if dim == "row":
     for row in range(r+n, df.shape[0]):
-      if df.iloc[row, c] is not np.nan: 
+      if df.iloc[row, c] is not (np.nan and None): 
         return row, c
         break
   if dim == "col": 
     for col in range(c+n, df.shape[1]):
-      if df.iloc[r, col] is not np.nan:
+      if df.iloc[r, col] is not (np.nan and None):
         return r, col
         break
 
@@ -260,7 +260,7 @@ checklist = pd.DataFrame({'Category': cat_checklist, 'Factory': fac_checklist, '
 with pd.ExcelWriter("../PO/" + season + "_PreProduction_checklist.xlsx", mode = 'w') as writer:
   checklist.to_excel(writer, sheet_name = 'checklist', header = None, index = False)
 
-# ----------- input shipment -------------
+# ----------- input shipment: CA - Surrey -------------
 import pandas as pd
 import numpy as np
 import os
@@ -268,10 +268,18 @@ import re
 from glob import glob
 from openpyxl import Workbook
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
 
+# !! insert column for shipment in tracking file in Excel first !!
+season = "2024SS"
 ship = "S1"
+total_c = 5 # column number for Total PO in Pcs
+remaint_c = 11 # column number for total remain in Pcs
+remainr_c = 15 # column number for regional remain in Pcs
 insert_c = 17 # column number for shipment in tracking file
-remain_c = 15 # column number to deduct qty from in tracking file
+thin = Side(border_style = "thin", color = "000000")
+thick = Side(border_style = "thick", color = "0033CCCC")
+center = Alignment(horizontal = "center", vertical = "center", wrap_text = True)
 ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))[0]
 shipment = load_workbook(ship_f)
 sheets = shipment.get_sheet_names()
@@ -288,7 +296,7 @@ shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
 
 POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")
 POtrack1 = POtrack[season]
-POtrack1.insert_cols(insert_c)
+POtrack_df = pd.DataFrame(POtrack1.values)
 POtrack1.cell(1, insert_c).value = ship
 POtrack1.cell(1, insert_c).alignment = center
 POtrack1.cell(4, insert_c).value = "SKU & Qty (Pcs)"
@@ -296,6 +304,50 @@ POtrack1.cell(4, insert_c).font = Font(size = 11, bold = True)
 POtrack1.cell(4, insert_c).alignment = center
 POtrack1.cell(4, insert_c).fill = PatternFill("solid", fgColor = "00FFCC00")
 POtrack1.cell(4, insert_c).border = Border(top = thin, bottom = thin, left = thin, right = thin)
+for i in range(len(shipment_PO)):
+  print(shipment_PO.loc[i, "PO"])
+  mask = POtrack_df.applymap(lambda x: str(shipment_PO.loc[i, "PO"]) in str(x)).to_numpy()
+  r, c = np.argwhere(mask)[0]
+  POtrack1.cell(r + 1, insert_c).value = shipment_PO.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c).value = POtrack1.cell(r + 1, remaint_c).value - shipment_PO.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c + 1).value = format(POtrack1.cell(r + 1, remaint_c).value / POtrack1.cell(r + 1, total_c).value, ".1%")
+  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -1: 
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "00FF0000")
+  else:
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "0000FF00")
+  try: 
+    POtrack1.cell(r + 1, remainr_c).value = POtrack1.cell(r + 1, remainr_c).value - shipment_PO.loc[i, "QTY"]
+    POtrack1.cell(r + 1, remainr_c + 1).value = format(POtrack1.cell(r + 1, remainr_c).value / POtrack1.cell(r + 1, remainr_c - 1).value, ".1%")
+    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -1: 
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
+    else:
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
+  except: print("ERROR")
 
+for i in range(len(shipment_all)):
+  print(shipment_all.loc[i, "PO"], shipment_all.loc[i, "SKU"])
+  mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "PO"]) in str(x)).to_numpy()
+  r_1, c = np.argwhere(mask)[0]
+  r_2, c = next_non_empty(POtrack_df, shipment_all.loc[i, "PO"], "row", 1)
+  mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "SKU"]) in str(x)).to_numpy()
+  for j in range(len(np.argwhere(mask))): 
+    r, c = np.argwhere(mask)[j]
+    if r > r_1 and r < r_2: 
+      break
+  POtrack1.cell(r + 1, insert_c).value = shipment_all.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c).value = POtrack1.cell(r + 1, remaint_c).value - shipment_all.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c + 1).value = format(POtrack1.cell(r + 1, remaint_c).value / POtrack1.cell(r + 1, total_c).value, ".1%")
+  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -1: 
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "00FF0000")
+  else:
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "0000FF00")
+  try: 
+    POtrack1.cell(r + 1, remainr_c).value = POtrack1.cell(r + 1, remainr_c).value - shipment_all.loc[i, "QTY"]
+    POtrack1.cell(r + 1, remainr_c + 1).value = format(POtrack1.cell(r + 1, remainr_c).value / POtrack1.cell(r + 1, remainr_c - 1).value, ".1%")
+    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -1: 
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
+    else:
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
+  except: print("ERROR")
 
 POtrack.save("../PO/" + season + " China to Global Shipment Tracking1.xlsx")
