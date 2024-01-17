@@ -158,7 +158,6 @@ for i in POn:
     PO_detail = PO_detail[PO_detail['产品编号'].str.contains('-')]
     if total != PO_detail['订单总数量'].sum(): 
       print('ERROR: Total in Pcs does not match.', total, PO_detail['订单总数量'].sum())
-      break
     
     cat_list = list(dict.fromkeys(PO_detail['产品编号'].replace('-.*', '', regex = True).tolist()))
     fac_list = list(dict.fromkeys([factory[x] for x in cat_list]))
@@ -260,6 +259,31 @@ checklist = pd.DataFrame({'Category': cat_checklist, 'Factory': fac_checklist, '
 with pd.ExcelWriter("../PO/" + season + "_PreProduction_checklist.xlsx", mode = 'w') as writer:
   checklist.to_excel(writer, sheet_name = 'checklist', header = None, index = False)
 
+POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+POtrack1 = POtrack[season]
+POtrack_df = pd.DataFrame(POtrack1.values)
+for i in range(len(POtrack_df)):
+  if POtrack1.cell(i + 1, 5).value == 0:
+    POtrack1.cell(i + 1, 12).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 12).font = Font(color = "0000FF00")
+  if POtrack1.cell(i + 1, 14).value == 0:
+    POtrack1.cell(i + 1, 16).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 16).font = Font(color = "0000FF00")
+  if POtrack1.cell(i + 1, 18).value == 0:
+    POtrack1.cell(i + 1, 20).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 20).font = Font(color = "0000FF00")
+  if POtrack1.cell(i + 1, 22).value == 0:
+    POtrack1.cell(i + 1, 24).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 24).font = Font(color = "0000FF00")
+  if POtrack1.cell(i + 1, 26).value == 0:
+    POtrack1.cell(i + 1, 28).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 28).font = Font(color = "0000FF00")
+  if POtrack1.cell(i + 1, 30).value == 0:
+    POtrack1.cell(i + 1, 32).value = format(0, ".1%")
+    POtrack1.cell(i + 1, 32).font = Font(color = "0000FF00")
+
+POtrack.save("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+
 # ----------- input shipment: CA - Surrey -------------
 import pandas as pd
 import numpy as np
@@ -311,14 +335,14 @@ for i in range(len(shipment_PO)):
   POtrack1.cell(r + 1, insert_c).value = shipment_PO.loc[i, "QTY"]
   POtrack1.cell(r + 1, remaint_c).value = POtrack1.cell(r + 1, remaint_c).value - shipment_PO.loc[i, "QTY"]
   POtrack1.cell(r + 1, remaint_c + 1).value = format(POtrack1.cell(r + 1, remaint_c).value / POtrack1.cell(r + 1, total_c).value, ".1%")
-  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -1: 
+  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -10: 
     POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "00FF0000")
   else:
     POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "0000FF00")
   try: 
     POtrack1.cell(r + 1, remainr_c).value = POtrack1.cell(r + 1, remainr_c).value - shipment_PO.loc[i, "QTY"]
     POtrack1.cell(r + 1, remainr_c + 1).value = format(POtrack1.cell(r + 1, remainr_c).value / POtrack1.cell(r + 1, remainr_c - 1).value, ".1%")
-    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -1: 
+    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -10: 
       POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
     else:
       POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
