@@ -284,7 +284,7 @@ for i in range(len(POtrack_df)):
 
 POtrack.save("../PO/" + season + " China to Global Shipment Tracking.xlsx")
 
-# ----------- input shipment: CA - Surrey -------------
+# ----------- input shipment: to Surrey -------------
 import pandas as pd
 import numpy as np
 import os
@@ -293,17 +293,17 @@ from glob import glob
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
-
-# !! insert column for shipment in tracking file in Excel first !!
-season = "2024SS"
-ship = "S1"
-total_c = 5 # column number for Total PO in Pcs
-remaint_c = 11 # column number for total remain in Pcs
-remainr_c = 15 # column number for regional remain in Pcs
-insert_c = 17 # column number for shipment in tracking file
 thin = Side(border_style = "thin", color = "000000")
 thick = Side(border_style = "thick", color = "0033CCCC")
 center = Alignment(horizontal = "center", vertical = "center", wrap_text = True)
+
+# !! insert column for shipment in tracking file in Excel first !!
+season = "2024SS"
+ship = "S8"
+total_c = 5 # column number for Total PO in Pcs
+remaint_c = 11 # column number for total remain in Pcs
+remainr_c = 15 # column number for regional remain in Pcs
+insert_c = 24 # column number for shipment in tracking file
 ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))[0]
 shipment = load_workbook(ship_f)
 sheets = shipment.get_sheet_names()
@@ -316,12 +316,112 @@ for i in range(1, len(sheets)):
   PO_all = PO_all + shipment_i["PO #"].to_list()
 
 shipment_all = pd.DataFrame({"PO": PO_all, "SKU": sku_all, "QTY": qty_all}).groupby(["PO", "SKU"]).sum().reset_index()
+shipment_all = shipment_all[shipment_all['PO'].str.contains("P")].reset_index().drop(columns = "index")
 shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
 
 POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")
 POtrack1 = POtrack[season]
 POtrack_df = pd.DataFrame(POtrack1.values)
-POtrack1.cell(1, insert_c).value = ship
+POtrack1.cell(1, insert_c).value = ship + " (TWK-CA)"
+POtrack1.cell(1, insert_c).alignment = center
+POtrack1.cell(4, insert_c).value = "SKU & Qty (Pcs)"
+POtrack1.cell(4, insert_c).font = Font(size = 11, bold = True)
+POtrack1.cell(4, insert_c).alignment = center
+POtrack1.cell(4, insert_c).fill = PatternFill("solid", fgColor = "00FFCC00")
+POtrack1.cell(4, insert_c).border = Border(top = thin, bottom = thin, left = thin, right = thin)
+for i in range(len(shipment_PO)):
+  print(shipment_PO.loc[i, "PO"])
+  mask = POtrack_df.applymap(lambda x: str(shipment_PO.loc[i, "PO"]) in str(x)).to_numpy()
+  r, c = np.argwhere(mask)[0]
+  POtrack1.cell(r + 1, insert_c).value = shipment_PO.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c).value = POtrack1.cell(r + 1, remaint_c).value - shipment_PO.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c + 1).value = format(POtrack1.cell(r + 1, remaint_c).value / POtrack1.cell(r + 1, total_c).value, ".1%")
+  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -10: 
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "00FF0000")
+  else:
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "0000FF00")
+  try: 
+    POtrack1.cell(r + 1, remainr_c).value = POtrack1.cell(r + 1, remainr_c).value - shipment_PO.loc[i, "QTY"]
+    POtrack1.cell(r + 1, remainr_c + 1).value = format(POtrack1.cell(r + 1, remainr_c).value / POtrack1.cell(r + 1, remainr_c - 1).value, ".1%")
+    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -10: 
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
+    else:
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
+  except: print("ERROR")
+
+for i in range(len(shipment_all)):
+  print(shipment_all.loc[i, "PO"], shipment_all.loc[i, "SKU"])
+  mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "PO"]) in str(x)).to_numpy()
+  r_1, c = np.argwhere(mask)[0]
+  r_2, c = next_non_empty(POtrack_df, shipment_all.loc[i, "PO"], "row", 1)
+  mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "SKU"]) in str(x)).to_numpy()
+  for j in range(len(np.argwhere(mask))): 
+    r, c = np.argwhere(mask)[j]
+    if r > r_1 and r < r_2: 
+      break
+  POtrack1.cell(r + 1, insert_c).value = shipment_all.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c).value = POtrack1.cell(r + 1, remaint_c).value - shipment_all.loc[i, "QTY"]
+  POtrack1.cell(r + 1, remaint_c + 1).value = format(POtrack1.cell(r + 1, remaint_c).value / POtrack1.cell(r + 1, total_c).value, ".1%")
+  if float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remaint_c + 1).value.strip("%")) < -1: 
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "00FF0000")
+  else:
+    POtrack1.cell(r + 1, remaint_c + 1).font = Font(color = "0000FF00")
+  try: 
+    POtrack1.cell(r + 1, remainr_c).value = POtrack1.cell(r + 1, remainr_c).value - shipment_all.loc[i, "QTY"]
+    POtrack1.cell(r + 1, remainr_c + 1).value = format(POtrack1.cell(r + 1, remainr_c).value / POtrack1.cell(r + 1, remainr_c - 1).value, ".1%")
+    if float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) > 1 or float(POtrack1.cell(r + 1, remainr_c + 1).value.strip("%")) < -1: 
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
+    else:
+      POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
+  except: print("ERROR")
+
+POtrack.save("../PO/" + season + " China to Global Shipment Tracking1.xlsx")
+
+# ----------- input shipment: to Amazon -------------
+import pandas as pd
+import numpy as np
+import os
+import re
+from glob import glob
+from openpyxl import Workbook
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
+thin = Side(border_style = "thin", color = "000000")
+thick = Side(border_style = "thick", color = "0033CCCC")
+center = Alignment(horizontal = "center", vertical = "center", wrap_text = True)
+
+# !! insert column for shipment in tracking file in Excel first !!
+season = "2024SS"
+ship = "CN02-UK"
+destination = "FBA-UK"
+total_c = 5 # column number for Total PO in Pcs
+remaint_c = 11 # column number for total remain in Pcs
+remainr_c = 27 # column number for regional remain in Pcs
+insert_c = 30 # column number for shipment in tracking file
+masterSKU = pd.read_excel(glob(os.path.join("../../TWK 2020 share/1-MasterSKU-All-Product-" + "*.xlsx"))[-1], sheet_name = 0, skiprows = 1, header = 2, engine = "openpyxl")
+masterSKU.columns = masterSKU.columns.str.replace('\n', '.').str.replace(' ', '.').str.replace('_x000D_', '')
+masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
+masterSKU["Main.FBASKU.UK"].fillna(masterSKU["Main.FBASKU.US"], inplace=True)
+masterSKU["Main.FBASKU.UK"].fillna(masterSKU.MSKU, inplace=True)
+masterSKU = pd.Series(masterSKU.MSKU.values, index = masterSKU["Main.FBASKU.UK"]).to_dict()
+PO_f = pd.read_excel(glob(os.path.join("../PO/shipment/*" + ship + "*/*装箱单*.xlsx"))[0], sheet_name = "汇总", engine = "openpyxl", header = 0)
+PO_f['cat'] = PO_f['SKU'].str.replace('-.*', '', regex = True)
+PO_f['订单号'] = PO_f['订单号'].str.replace('-.*', '', regex = True)
+PO_f = pd.Series(PO_f["订单号"].values, index = PO_f["cat"]).to_dict()
+ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/ManifestFileUpload_Template*MPL*.xlsx"))[0]
+shipment = pd.read_excel(ship_f, sheet_name = "Create workflow – template", engine = "openpyxl", header = 0, skiprows = 7)
+shipment['SKU'] = shipment['Merchant SKU'].map(masterSKU)
+shipment['SKU'].fillna(shipment['Merchant SKU'].str.replace('-A.*', '', regex = True), inplace=True)
+shipment['cat'] = shipment['SKU'].str.replace('-.*', '', regex = True)
+shipment['PO'] = shipment['cat'].map(PO_f)
+
+shipment_all = pd.DataFrame({"PO": shipment['PO'], "SKU": shipment['SKU'], "QTY": shipment['Quantity']}).groupby(["PO", "SKU"]).sum().reset_index()
+shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
+
+POtrack = load_workbook("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+POtrack1 = POtrack[season]
+POtrack_df = pd.DataFrame(POtrack1.values)
+POtrack1.cell(1, insert_c).value = ship + " (" + destination + ")"
 POtrack1.cell(1, insert_c).alignment = center
 POtrack1.cell(4, insert_c).value = "SKU & Qty (Pcs)"
 POtrack1.cell(4, insert_c).font = Font(size = 11, bold = True)
