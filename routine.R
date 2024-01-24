@@ -66,7 +66,7 @@ write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.nam
 
 # -------- Request stock from Surrey: at request --------------------
 # input Clover > Inventory > Items > Export.
-request <- c("BTB", "SKX", "WJA") # categories to restock
+request <- c("IHT", "SKG", "WJA", "WGS") # categories to restock
 n <- 1       # Qty per SKU to stock at Richmond
 n_xoro <- 10 # min Qty in stock at Surrey to request
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
@@ -89,7 +89,7 @@ qty_sold <- 50       # Sales rate low: base Qty sold on website last month
 size_percent <- 0.5  # % of sizes not available 
 f <- "../FBArefill/Historic sales and inv. data for all cats v31 (20240104).xlsx"
 f1 <- "../xoro/Item Inventory Snapshot_12012023.csv"
-mastersku <- read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
+mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) 
 rownames(mastersku) <- mastersku$MSKU
 xoro <- read.csv(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".csv"), full.names = T), as.is = T) %>% filter(Store == "Warehouse - JJ") %>% 
   mutate(seasons = mastersku[Item., "Seasons"], cat_print = gsub("(\\w+-\\w+)-.*", "\\1", Item.))
