@@ -10,7 +10,7 @@ library(tidyr)
 xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.))
 rownames(xoro) <- xoro$Item.
 woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
-  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price))
+  filter(!duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price))
 rownames(woo) <- woo$SKU
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 rownames(products_description) <- products_description$SPU
@@ -35,14 +35,14 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 
 ### -------- create new listing ------------------------
 new_season <- "24"
-mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-"))
+mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-"))
 rownames(mastersku) <- mastersku$MSKU
 catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU-category", fillMergedCells = T) %>% filter(!duplicated(SKU))
 rownames(catprint) <- catprint$SKU
-image <- read.table("../woo/ImageSrc.tsv", sep = "\t", as.is = T, header = T)
+image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T)
 rownames(image) <- image$SKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
-categories <- subset(unique(woo$cat), !(unique(woo$cat) %in% products_description$cat) & unique(woo$cat) %in% products_description_cat$cat)
+categories <- products_description_cat$cat
 
 #### description and details for the new listing
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
@@ -53,12 +53,12 @@ write.xlsx(products_description_cat, file = "../XHS/products_description_categor
 # !open products_description_cat in excel and fill in info
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1)
 rownames(products_description_cat) <- products_description_cat$cat
-mastersku_SPU <- mastersku %>% filter(MSKU.Status == "Active", !duplicated(SPU))
+mastersku_SPU <- mastersku %>% filter(MSKU.Status == "Active") %>% filter(!duplicated(SPU))
 rownames(mastersku_SPU) <- mastersku_SPU$SPU
-new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
-  filter(!(SPU %in% toupper(products_XHS$SPU)))
+new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Seasons = mastersku_SPU[SPU, "Seasons.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
+  filter(!(SPU %in% toupper(products_XHS$SPU)), !is.na(Image.Src))
 rownames(new_description) <- new_description$SPU
-products_description <- rbind(products_description %>% select(-X.), new_description)
+products_description <- rbind(products_description, new_description %>% select(-Seasons))
 write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 # !open products_description in excel and fill in missing info
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
