@@ -96,7 +96,7 @@ xoro <- read.csv(list.files(path = "../xoro/", pattern = paste0("Item Inventory 
 rownames(xoro) <- xoro$Item.
 ## move offline 
 offline <- xoro %>% filter(!grepl(new_season, seasons) & ATS <= qty_offline & ATS > 0) %>% arrange(Item.)
-write.csv(offline, file = paste0("../SKUmanagement/offline_", Sys.Date(), ".csv"), row.names = F, na = "")
+write.csv(offline, file = paste0("../Analysis/offline_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 ## suggest to website deals page 
 woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
@@ -113,7 +113,7 @@ size_limited <- xoro %>% filter(!grepl(new_season, seasons) & ATS > qty_offline)
 rownames(size_limited) <- size_limited$cat_print
 deals <- xoro %>% mutate(lastmonth = xoro_lastmonth[Item., "ATS"], cat = gsub("-.*", "", Item.), threshold = ifelse(cat %in% JJ_month_ratio$Category, qty_sold*JJ_month_ratio[cat, "monthR"], ifelse(grepl(in_season, seasons), 8, 2))) %>% filter(cat_print %in% size_limited$cat_print & !grepl(new_season, seasons) & ATS > qty_offline & lastmonth - ATS < threshold & lastmonth - ATS > 0) %>% 
   mutate(size_percent = percent(size_limited[cat_print, "percent"]), discount = percent(woo[Item., "discount"], accuracy = 0.1)) %>% arrange(Item.)
-write.csv(deals, file = paste0("../SKUmanagement/deals_", Sys.Date(), ".csv"), row.names = F, na = "")
+write.csv(deals, file = paste0("../Analysis/deals_", Sys.Date(), ".csv"), row.names = F, na = "")
 # email Joren and Kamer
 ## to inactivate 
 clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(!duplicated(Name), !is.na(Name))
@@ -128,7 +128,7 @@ inventory_s <- inventory %>% count(Adjust_MSKU, wt = Inv_Total_End.WK)
 rownames(inventory_s) <- inventory_s$Adjust_MSKU
 qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(Inv_clover = clover[MSKU, "Quantity"], Inv_Total_EndWK = inventory_s[MSKU, "n"]) %>% 
   filter(!grepl(new_season, Seasons.SKU) & MSKU.Status == "Active" & Inv_clover == 0 & Inv_Total_EndWK == 0)
-write.csv(qty0, file = paste0("../SKUmanagement/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
+write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
 # -------- Prepare to generate barcode image: at request ------------
