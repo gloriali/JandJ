@@ -299,7 +299,7 @@ center = Alignment(horizontal = "center", vertical = "center", wrap_text = True)
 
 # !! insert column for shipment in tracking file in Excel first !!
 season = "2024SS"
-ship = "S8"
+ship = "S9"
 total_c = 5 # column number for Total PO in Pcs
 remaint_c = 11 # column number for total remain in Pcs
 remainr_c = 15 # column number for regional remain in Pcs
@@ -392,18 +392,18 @@ center = Alignment(horizontal = "center", vertical = "center", wrap_text = True)
 
 # !! insert column for shipment in tracking file in Excel first !!
 season = "2024SS"
-ship = "CN02-UK"
-destination = "FBA-UK"
+ship = "S9"
+destination = "FBA-US"
 total_c = 5 # column number for Total PO in Pcs
 remaint_c = 11 # column number for total remain in Pcs
-remainr_c = 27 # column number for regional remain in Pcs
-insert_c = 30 # column number for shipment in tracking file
+remainr_c = 15 # column number for regional remain in Pcs
+insert_c = 25 # column number for shipment in tracking file
 masterSKU = pd.read_excel(glob(os.path.join("../../TWK 2020 share/1-MasterSKU-All-Product-" + "*.xlsx"))[-1], sheet_name = 0, skiprows = 1, header = 2, engine = "openpyxl")
 masterSKU.columns = masterSKU.columns.str.replace('\n', '.').str.replace(' ', '.').str.replace('_x000D_', '')
 masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
-masterSKU["Main.FBASKU.UK"].fillna(masterSKU["Main.FBASKU.US"], inplace=True)
-masterSKU["Main.FBASKU.UK"].fillna(masterSKU.MSKU, inplace=True)
-masterSKU = pd.Series(masterSKU.MSKU.values, index = masterSKU["Main.FBASKU.UK"]).to_dict()
+masterSKU["Main.FBASKU.US"].fillna(masterSKU["Main.FBASKU.US"], inplace=True)
+masterSKU["Main.FBASKU.US"].fillna(masterSKU.MSKU, inplace=True)
+masterSKU = pd.Series(masterSKU.MSKU.values, index = masterSKU["Main.FBASKU.US"]).to_dict()
 PO_f = pd.read_excel(glob(os.path.join("../PO/shipment/*" + ship + "*/*装箱单*.xlsx"))[0], sheet_name = "汇总", engine = "openpyxl", header = 0)
 PO_f['cat'] = PO_f['SKU'].str.replace('-.*', '', regex = True)
 PO_f['订单号'] = PO_f['订单号'].str.replace('-.*', '', regex = True)
@@ -414,7 +414,6 @@ shipment['SKU'] = shipment['Merchant SKU'].map(masterSKU)
 shipment['SKU'].fillna(shipment['Merchant SKU'].str.replace('-A.*', '', regex = True), inplace=True)
 shipment['cat'] = shipment['SKU'].str.replace('-.*', '', regex = True)
 shipment['PO'] = shipment['cat'].map(PO_f)
-
 shipment_all = pd.DataFrame({"PO": shipment['PO'], "SKU": shipment['SKU'], "QTY": shipment['Quantity']}).groupby(["PO", "SKU"]).sum().reset_index()
 shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
 
@@ -475,3 +474,4 @@ for i in range(len(shipment_all)):
   except: print("ERROR")
 
 POtrack.save("../PO/" + season + " China to Global Shipment Tracking1.xlsx")
+# review and copy to TWK 2020 share\twk general\1-orders (formerly upcoming shipments)\0 - global shipments from China
