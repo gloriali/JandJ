@@ -38,7 +38,7 @@ write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".cs
 
 # ------------- move to website deals page -------------
 sheets <- grep("-SKU$", getSheetNames(RawData), value = T)
-columns <- ifelse(format(Sys.Date(), "%m") == "01", c(1:11, 26:37), c(1:11, 13:(as.numeric(format(Sys.Date(), "%m"))-1+12), (25+as.numeric(format(Sys.Date(), "%m"))):37))
+if(format(Sys.Date(), "%m") == "01"){columns <- c(1:11, 26:37)}else{columns <- c(1:11, 13:(as.numeric(format(Sys.Date(), "%m"))-1+12), (25+as.numeric(format(Sys.Date(), "%m"))):37)}
 # email Joren and Kamer
 
 # ------------- FW clearance -------------
