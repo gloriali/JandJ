@@ -37,26 +37,44 @@ qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(MSKU = t
 write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
-# ------------- move to website deals page -------------
+# ------------- update monthly ratio and sales -------------
+names <- c(Category = "Cat_SKU", Month01="Jan", Month02="Feb", Month03="Mar", Month04="Apr", Month05="May", Month06="June", Month07="July", Month08="Aug", Month09="Sep", Month10="Oct", Month11="Nov", Month12="Dec")
 monR_last_yr <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRatio2023_category_adjust_2024-01-25.csv", full.names = T), as.is = T) %>% `row.names<-`(.[, "Category"])
 month <- format(Sys.Date(), "%m")
 sheets <- grep("-SKU$", getSheetNames(RawData), value = T)
 if(month == "01"){columns <- c(1:11, 26:37)}else{columns <- c(1:11, 13:(as.numeric(month)-1+12), (25+as.numeric(month)):37)}
 sales_cat_last12month <- data.frame()
+sales_SKU_last12month <- data.frame()
 for(sheet in sheets){
-  sales_cat_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) 
-  if(sum(grepl("janandjul.com", sales_cat_last12month_i[[1]]))){
-    sales_cat_last12month_i <- sales_cat_last12month_i %>% filter(.[[1]] == "All Marketplaces") %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
+  sales_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) 
+  if(sum(grepl("janandjul.com", sales_last12month_i[[1]]))){
+    sales_cat_last12month_i <- sales_last12month_i %>% filter(.[[1]] == "All Marketplaces") %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
     sales_cat_last12month <- rbind(sales_cat_last12month, sales_cat_last12month_i)
+    sales_SKU_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) %>% 
+      filter(!(Sales.Channel %in% c("Summary", "Sales Channel", "All Marketplaces"))) %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
+    sales_SKU_last12month <- rbind(sales_SKU_last12month, sales_SKU_last12month_i)
   }
 }
-sales_cat_last12month <- sales_cat_last12month %>% filter(Total.2023 > 0)
-if(month == "01"){
-  monR <- monR_last_yr
+sales_SKU_last12month <- sales_SKU_last12month %>% rename(all_of(names)) %>% select(Adjust_MSKU, Month01:Month12) %>% mutate(across(Month01:Month12, ~as.numeric(.)))
+write.csv(sales_SKU_last12month, file = paste0("../Analysis/Sales_SKU_last12month_", Sys.Date(), ".csv"), row.names = F)
+if(month %in% c("01", "02")){
+  monR <- monR_last_yr %>% select(Category, Month01:Month12) %>% `row.names<-`(toupper(.[, "Category"]))
 }else{
-  monR_last_yr <- monR_last_yr %>% rowwise() %>% mutate(T.new = sum(.[, sprintf("Month%02d", c(1:(as.numeric(month)-1)))]))
+  monR_last_yr <- monR_last_yr %>% rowwise() %>% mutate(T.new = sum(c_across(Month01:as.name(sprintf("Month%02d", (as.numeric(month)-1)))))) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Category"]))
+  sales_cat_last12month <- sales_cat_last12month %>% rename(all_of(names)) %>% mutate(across(Month01:Month12, ~as.numeric(.))) %>% rowwise() %>% mutate(T.new = sum(c_across(Month01:as.name(sprintf("Month%02d", (as.numeric(month)-1))))), MonR.new = monR_last_yr[Category, "T.new"]) %>% 
+    filter(!is.na(MonR.new)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Category"]))
+  monR_new <- sales_cat_last12month %>% mutate(across(Month01:as.name(sprintf("Month%02d", (as.numeric(month)-1))), ~ ./T.new*MonR.new))
+  monR_new[monR_new$T.new == 0, ] <- monR_new[monR_new$T.new == 0, ] %>% rows_update(., monR_last_yr %>% select(Category, Month01:as.name(sprintf("Month%02d", (as.numeric(month)-1)))), by = "Category", unmatched = "ignore")
+  monR <- merge(monR_new %>% select(Category, Month01:as.name(sprintf("Month%02d", (as.numeric(month)-1)))), monR_last_yr %>% select(Category, as.name(sprintf("Month%02d", as.numeric(month))):Month12), by = "Category") %>% `row.names<-`(toupper(.[, "Category"]))
 }
-# email Joren and Kamer
+write.csv(monR, file = paste0("../Analysis/MonthlyRatio_", Sys.Date(), ".csv"), row.names = F)
+
+# ------------- move to website deals page -------------
+if(month %in% c("01", "02", "03", "04")){last3m <- sprintf("Month%02d", c(1:(as.numeric(month)-1), (as.numeric(month)-3+12):12))}else{last3m <- sprintf("Month%02d", c((as.numeric(month)-3):(as.numeric(month)-1)))}
+sales_SKU_last3month <- sales_SKU_last12month %>% rowwise() %>% mutate(T.last3m = sum(c_across(as.name(last3m[1]), as.name(last3m[2]), as.name(last3m[3])))) %>% 
+  group_by(Adjust_MSKU) %>% summarise(T.last3m = sum(T.last3m)) %>% as.data.frame() %>% `row.names<-`(.[, "Adjust_MSKU"])
+
+# email Joren and Kamer 
 
 # ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
