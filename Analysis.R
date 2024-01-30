@@ -7,12 +7,11 @@ library(xlsx)
 new_season <- "24"   # New season contains
 in_season <- "F"     # "F": Sept - Feb; "S": Mar - Aug
 qty_offline <- 3     # Qty to move to offline sales
-qty_sold <- 50       # Sales rate low: Qty sold on website last month
 size_percent <- 0.5  # % of sizes not available 
+RawData <- list.files(path = "../FBArefill/Raw Data File/", pattern = "Historic sales and inv. data for all cats", full.names = T)
 
 mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
 mastersku_adjust <- mastersku %>% filter(!duplicated(Adjust.SKU)) %>% `row.names<-`(toupper(.[, "Adjust.SKU"])) 
-RawData <- "../FBArefill/Raw Data File/Historic sales and inv. data for all cats v34 (20240123).xlsx"
 xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% 
   mutate(Item. = toupper(Item.), ATS = as.numeric(ATS), Seasons = ifelse(Item. %in% mastersku$MSKU, mastersku[Item., "Seasons.SKU"], mastersku_adjust[Item., "Seasons.SKU"]), SPU = gsub("(\\w+-\\w+)-.*", "\\1", Item.)) %>% `row.names<-`(.[, "Item."])
 
@@ -24,7 +23,7 @@ write.csv(offline, file = paste0("../Analysis/offline_", Sys.Date(), ".csv"), ro
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
 # ------------- to inactivate --------------------------
-clover <- read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "SKU"]))
+clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "Name"]))
 sheets <- grep("-WK", getSheetNames(RawData), value = T)
 inventory <- data.frame()
 for(sheet in sheets){
@@ -39,13 +38,27 @@ write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".cs
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
 # ------------- move to website deals page -------------
+monR_last_yr <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRatio2023_category_adjust_2024-01-25.csv", full.names = T), as.is = T) %>% `row.names<-`(.[, "Category"])
+month <- format(Sys.Date(), "%m")
 sheets <- grep("-SKU$", getSheetNames(RawData), value = T)
-if(format(Sys.Date(), "%m") == "01"){columns <- c(1:11, 26:37)}else{columns <- c(1:11, 13:(as.numeric(format(Sys.Date(), "%m"))-1+12), (25+as.numeric(format(Sys.Date(), "%m"))):37)}
+if(month == "01"){columns <- c(1:11, 26:37)}else{columns <- c(1:11, 13:(as.numeric(month)-1+12), (25+as.numeric(month)):37)}
+sales_cat_last12month <- data.frame()
+for(sheet in sheets){
+  sales_cat_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) 
+  if(sum(grepl("janandjul.com", sales_cat_last12month_i[[1]]))){
+    sales_cat_last12month_i <- sales_cat_last12month_i %>% filter(.[[1]] == "All Marketplaces") %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
+    sales_cat_last12month <- rbind(sales_cat_last12month, sales_cat_last12month_i)
+  }
+}
+sales_cat_last12month <- sales_cat_last12month %>% filter(Total.2023 > 0)
+if(month == "01"){
+  monR <- monR_last_yr
+}else{
+  monR_last_yr <- monR_last_yr %>% rowwise() %>% mutate(T.new = sum(.[, sprintf("Month%02d", c(1:(as.numeric(month)-1)))]))
+}
 # email Joren and Kamer
 
-# ------------- FW clearance -------------
-## summarize raw sales data
-RawData <- "../FBArefill/Raw Data File/Archive/Historic sales and inv. data for all cats v31 (20240104).xlsx"
+# ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
 sheets_cat <- sheets[!grepl("-", sheets)&!grepl("Sale", sheets)]
 sales_cat <- data.frame()
@@ -78,7 +91,7 @@ for(sheet in sheets_SKU){
 sales_SKU <- sales_SKU %>% filter(Total.2023 > 0) %>% filter(!duplicated(Adjust_MSKU))
 write.csv(sales_SKU, file = paste0("../Analysis/Sales2023_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
 
-## FW clearance
+# ------------- FW clearance -------------
 monR_cat <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRatio2023_category_adjust_2024-01-25.csv", full.names = T), as.is = T) %>% mutate(FW_peak = Sep + Oct + Nov + Dec, Jan2Jun = Jan + Feb + Mar + Apr + May + June) %>% `row.names<-`(.[, "Category"])
 inventory <- read.csv(paste0("../Analysis/Sales_Inventory_SKU_", Sys.Date(), ".csv"), as.is = T) %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU)) %>% `row.names<-`(.[, "Adjust_MSKU"])
 inventory_SPU <- inventory %>% group_by(SPU) %>% summarise(qty_SPU = sum(Inv_Total_End.WK)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
