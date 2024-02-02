@@ -30,7 +30,8 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx")
 products_description_cat <- openxlsx::read.xlsx("../XHS/products_description_categories.xlsx", sheet = 1)
 rownames(products_description_cat) <- products_description_cat$cat
-products_description <- products_description %>% mutate(Description = products_description_cat[cat, "Description"])
+products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
+products_description <- products_description %>% mutate(Product.Name = products_description_cat[cat, "Product.Name"], Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"])
 write.xlsx(products_description, file = "../XHS/products_description.xlsx")
 
 ### -------- create new listing ------------------------
