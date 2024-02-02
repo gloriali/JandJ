@@ -26,13 +26,12 @@ openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", f
 ### -------- extract and update existing descriptions -----------------
 products_description <- products_XHS %>% filter(!duplicated(SPU)) %>% mutate(SPU = toupper(SPU), cat = gsub("-.*", "", SKU), Description = paste(Description, SEO.Description, Describe), Description = str_trim(gsub("NA", "", Description))) %>% select(SPU, Product.Name, cat, Description, Categories, Option1.Name, Image.Src)
 products_description_cat <- products_description %>% select(cat, Product.Name, Description, Categories, Option1.Name) %>% filter(!duplicated(cat)) %>% mutate(Product.Name = gsub("\\s?-\\s?\\w+$", "", Product.Name))
-write.xlsx(products_description, file = "../XHS/products_description.xlsx")
-write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx")
-products_description_cat <- openxlsx::read.xlsx("../XHS/products_description_categories.xlsx", sheet = 1)
-rownames(products_description_cat) <- products_description_cat$cat
+write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
+write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", row.names = F)
+products_description_cat <- openxlsx::read.xlsx("../XHS/products_description_categories.xlsx", sheet = 1) %>% `row.names<-`(toupper(.[, "cat"])) 
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
 products_description <- products_description %>% mutate(Product.Name = products_description_cat[cat, "Product.Name"], Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"])
-write.xlsx(products_description, file = "../XHS/products_description.xlsx")
+write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
 
 ### -------- create new listing ------------------------
 new_season <- "24"
@@ -50,7 +49,7 @@ products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetInde
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1)
 rownames(products_description_cat) <- products_description_cat$cat
 products_description_cat <- rbind(products_description_cat, data.frame(cat = categories) %>% mutate(Product.Name = catprint[cat, "Style.Name"], Description = "", Categories = catprint[cat, "Product.Category"], Option1.Name = "Size"))
-write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx")
+write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", row.names = F)
 # !open products_description_cat in excel and fill in info
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1)
 rownames(products_description_cat) <- products_description_cat$cat
@@ -60,7 +59,7 @@ new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in
   filter(!(SPU %in% toupper(products_XHS$SPU)), !is.na(Image.Src))
 rownames(new_description) <- new_description$SPU
 products_description <- rbind(products_description, new_description %>% select(-Seasons))
-write.xlsx(products_description, file = "../XHS/products_description.xlsx")
+write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
 # !open products_description in excel and fill in missing info
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 rownames(products_description) <- products_description$SPU
