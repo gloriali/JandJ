@@ -94,6 +94,14 @@ woo_deals <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regu
 write.csv(woo_deals, file = paste0("../Analysis/Deals_", Sys.Date(), ".csv"), row.names = F)
 # email Joren and Kamer 
 
+# ------------- FBA US CA low inventory -------------
+#inventory <- read.csv("../Analysis/Sales_Inventory_SKU_2024-01-31.csv", as.is = T)
+#sales_SKU_last12month <- read.csv("../Analysis/Sales_SKU_last12month_2024-01-31.csv", as.is = T)
+#monR <- read.csv("../Analysis/MonthlyRatio_2024-01-31.csv", as.is = T) %>% `row.names<-`(.[, "Category"])
+qty_refill <- 12
+inventory[is.na(inventory)] <- 0
+inventory <- inventory %>% mutate(Inv_WH_AMZ.CA.US = Inv_WH.JJ + Inv_AMZ.USA + Inv_AMZ.CA)
+
 # ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
 sheets_cat <- sheets[!grepl("-", sheets)&!grepl("Sale", sheets)]
