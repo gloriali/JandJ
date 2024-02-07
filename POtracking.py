@@ -292,6 +292,7 @@ import numpy as np
 import os
 import re
 from glob import glob
+from datetime import date
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
@@ -304,21 +305,24 @@ sku_c = 7 # column number for SKU - same for all shipments
 total_c = 5 # column number for Total PO in Pcs - same for all shipments
 remaint_c = 11 # column number for total remain in Pcs - same for all shipments
 remainr_c = 15 # column number for regional remain in Pcs - CA, UK, DE, CN, Wholesalers
-insert_c = 24 # column number for shipment in tracking file - inserted shipment column
-ship = "S9" # S1 CN01 etc
+insert_c = 26 # column number for shipment in tracking file - inserted shipment column
+ship = "S11" # S1 CN01 etc
 destination = "TWK-CA" # TWK-CA FBA-CA etc.
 
 ## To Surrey WH/Wholesalers
-ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))[0]
-shipment = load_workbook(ship_f)
-sheets = shipment.get_sheet_names()
+ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))
 sku_all = qty_all = PO_all = []
-for i in range(1, len(sheets)):
-  print(sheets[i])
-  shipment_i = pd.read_excel(ship_f, sheet_name = sheets[i], engine = "openpyxl", header = 0, usecols = "A:G", skiprows = 4).dropna(subset = ["SKU", "PO #"])
-  sku_all = sku_all + shipment_i["SKU"].to_list()
-  qty_all = qty_all + shipment_i["QTY SHIPPED"].to_list()
-  PO_all = PO_all + shipment_i["PO #"].to_list()
+for f in range(0, len(ship_f)): 
+  print(ship_f[f])
+  shipment = load_workbook(ship_f[f])
+  sheets = shipment.get_sheet_names()
+  for i in range(1, len(sheets)):
+    print(sheets[i])
+    shipment_i = pd.read_excel(ship_f[f], sheet_name = sheets[i], engine = "openpyxl", header = 0, usecols = "A:G", skiprows = 4).dropna(subset = ["SKU", "QTY SHIPPED"]).fillna(method='ffill')
+    sku_all = sku_all + shipment_i["SKU"].to_list()
+    qty_all = qty_all + shipment_i["QTY SHIPPED"].to_list()
+    PO_all = PO_all + shipment_i["PO #"].to_list()
+
 shipment_all = pd.DataFrame({"PO": PO_all, "SKU": sku_all, "QTY": qty_all}).groupby(["PO", "SKU"]).sum().reset_index()
 shipment_all = shipment_all[shipment_all['PO'].str.contains("P")].reset_index().drop(columns = "index")
 shipment_PO = shipment_all.groupby(["PO"]).sum().reset_index()
@@ -373,13 +377,17 @@ for i in range(len(shipment_PO)):
         POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
       else:
         POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
-    except: print("ERROR")
+    except: 
+      print("ERROR")
+  except: 
+    print("PO not in tracking file. ")
 
+POtrack_df_original = pd.DataFrame(POtrack1.values)
 for i in range(len(shipment_all)):
   print(shipment_all.loc[i, "PO"], shipment_all.loc[i, "SKU"])
   POtrack_df = pd.DataFrame(POtrack1.values)
   try:
-    mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "PO"]) in str(x)).to_numpy()
+    mask = POtrack_df_original.applymap(lambda x: str(shipment_all.loc[i, "PO"]) in str(x)).to_numpy()
     r_1, c = np.argwhere(mask)[0]
     r_2, c = next_non_empty(POtrack_df, shipment_all.loc[i, "PO"], "row", 1)
     mask = POtrack_df.applymap(lambda x: str(shipment_all.loc[i, "SKU"]) in str(x)).to_numpy()
@@ -401,12 +409,14 @@ for i in range(len(shipment_all)):
         POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "00FF0000")
       else:
         POtrack1.cell(r + 1, remainr_c + 1).font = Font(color = "0000FF00")
-    except: print("ERROR")
+    except: 
+      print("ERROR")
+  
   except: 
     r = POtrack_df.shape[0]
     POtrack1.cell(r + 1, po_c).value = shipment_all.loc[i, "PO"]
     POtrack1.cell(r + 1, sku_c).value = shipment_all.loc[i, "SKU"]
     POtrack1.cell(r + 1, insert_c).value = shipment_all.loc[i, "QTY"]
 
-POtrack.save("../PO/" + season + " China to Global Shipment Tracking1.xlsx")
+POtrack.save("../PO/" + season + " China to Global Shipment Tracking " + date.today().strftime('%Y-%m-%d') + ".xlsx")
 # review and copy to TWK 2020 share\twk general\1-orders (formerly upcoming shipments)\0 - global shipments from China
