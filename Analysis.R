@@ -111,6 +111,21 @@ Sales_Inv_ThisMonth <- Sales_Inv_ThisMonth %>% mutate(Enough_Inv_SPU = paste0(as
 write.csv(Sales_Inv_ThisMonth, file = paste0("../Analysis/Sales_Inv_Prediction_", Sys.Date(), ".csv"), row.names = F)
 # Email Joren and Kamer 
 
+# ------------- low inventory to add PO -------------
+#inventory <- read.csv("../Analysis/Sales_Inventory_SKU_2024-01-31.csv", as.is = T)
+#sales_SKU_last12month <- read.csv("../Analysis/Sales_SKU_last12month_2024-01-31.csv", as.is = T)
+#monR <- read.csv("../Analysis/MonthlyRatio_2024-01-31.csv", as.is = T) %>% `row.names<-`(.[, "Category"])
+#inventory <- inventory %>% mutate(Inv_WH_AMZ.CA.US = Inv_WH.JJ + Inv_AMZ.USA + Inv_AMZ.CA) %>% `row.names<-`(.[, "Adjust_MSKU"])
+if(month == "01"){last3m <- c("Month11", "Month12", "Month01")}else if(month %in% c("02", "03")){last3m <- sprintf("Month%02d", c(1:(as.numeric(month)-1), (as.numeric(month)-3+12):12))}else{last3m <- sprintf("Month%02d", c((as.numeric(month)-3):(as.numeric(month)-1)))}
+if(month == "12"){next4m <- c("Month01", "Month02", "Month03", "Month04")}else if(month %in% c("10", "11")){next4m <- sprintf("Month%02d", c(1:(as.numeric(month)-12+3), as.numeric(month):12))}else{next4m <- sprintf("Month%02d", c(as.numeric(month):(as.numeric(month)+3)))}
+monR <- monR %>% mutate(T.last3m = rowSums(across(c(as.name(last3m[1]), as.name(last3m[2]), as.name(last3m[3])))), T.next4m = rowSums(across(c(as.name(next4m[1]), as.name(next4m[2]), as.name(next4m[3]), as.name(next4m[4]))))) %>% `row.names<-`(.[, "Category"])
+Sales_Inv_Next4m <- sales_SKU_last12month %>% mutate(T.last3m = rowSums(across(c(as.name(last3m[1]), as.name(last3m[2]), as.name(last3m[3]))))) %>% filter(Sales.Channel %in% c("Amazon.com", "Amazon.ca", "janandjul.com")) %>% group_by(Adjust_MSKU) %>% summarise(Sales.last3m = sum(T.last3m)) %>% filter(Adjust_MSKU %in% inventory$Adjust_MSKU) %>%
+  mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU), cat = mastersku[Adjust_MSKU, "Category.SKU"], Seasons = mastersku[Adjust_MSKU, "Seasons.SKU"], Status = mastersku[Adjust_MSKU, "MSKU.Status"], AMZ_flag = mastersku[Adjust_MSKU, "Pause.Plan.FBA_x000D_.CA/US/MX/AU/UK/DE"], monR_last3m = monR[cat, "T.last3m"], monR_next4m = monR[cat, "T.next4m"], Sales.next4m = Sales.last3m/monR_last3m*monR_next4m, Inv_WH_AMZ.CA.US = inventory[Adjust_MSKU, "Inv_WH_AMZ.CA.US"], Enough_Inv = (Inv_WH_AMZ.CA.US >= Sales.next4m))
+Sales_Inv_Next4m_SPU <- Sales_Inv_Next4m %>% group_by(SPU) %>% summarise(Enough_Inv = mean(Enough_Inv)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+Sales_Inv_Next4m <- Sales_Inv_Next4m %>% mutate(Enough_Inv_SPU = paste0(as.character(as.integer(Sales_Inv_Next4m_SPU[SPU, "Enough_Inv"]*100)), "%")) %>% filter(grepl(new_season, Seasons), grepl(in_season, Seasons), Status == "Active", !Enough_Inv)
+write.csv(Sales_Inv_Next4m, file = paste0("../Analysis/Sales_Inv_Prediction_Next4m_", Sys.Date(), ".csv"), row.names = F)
+# Discuss with Florence and Matt
+
 # ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
 sheets_cat <- sheets[!grepl("-", sheets)&!grepl("Sale", sheets)]
