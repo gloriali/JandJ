@@ -103,7 +103,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Fo
 
 ## Factory code and master SKU
 factory = pd.read_excel("../../TWK 2020 share/1-MasterSKU_CatPrintsFactory.xlsx", sheet_name = 3, skiprows = 2, engine = "openpyxl")
-factory.drop(columns = ["Unnamed: 7", "Unnamed: 8", "Unnamed: 9", "Unnamed: 10"], inplace = True) 
+factory.drop(columns = ["Unnamed: 7", "Unnamed: 8", "Unnamed: 9"], inplace = True) 
 factory.rename(columns = {"Unnamed: 2": "JSMY"}, inplace=True)
 factory["id"] = factory.index
 factory = pd.melt(factory, id_vars = "id")
@@ -114,7 +114,7 @@ masterSKU.MSKU = [x.upper() for x in masterSKU.MSKU]
 masterSKU = pd.Series(masterSKU.Seasons.values, index = masterSKU.MSKU).to_dict()
 
 ## input PO files
-POn = ["P" + str(n) for n in range(279, 280)]
+POn = ["P" + str(n) for n in range(343, 344)]
 PO_checklist = fac_checklist = cat_checklist = []
 for i in POn:
   print(i)
@@ -283,7 +283,7 @@ for i in range(len(POtrack_df)):
     POtrack1.cell(i + 1, 32).value = format(0, ".1%")
     POtrack1.cell(i + 1, 32).font = Font(color = "0000FF00")
 
-POtrack.save("../PO/" + season + " China to Global Shipment Tracking.xlsx")
+POtrack.save("../PO/" + season + " China to Global Shipment Tracking " + date.today().strftime('%Y-%m-%d') + ".xlsx")
 
 # ----------- input shipment -------------
 ## !! insert column for the shipment in the tracking file in Excel first !!
@@ -304,10 +304,10 @@ po_c = 1 # column number for PO # - same for all shipments
 sku_c = 7 # column number for SKU - same for all shipments
 total_c = 5 # column number for Total PO in Pcs - same for all shipments
 remaint_c = 11 # column number for total remain in Pcs - same for all shipments
-remainr_c = 15 # column number for regional remain in Pcs - CA, UK, DE, CN, Wholesalers
-insert_c = 26 # column number for shipment in tracking file - inserted shipment column
-ship = "S11" # S1 CN01 etc
-destination = "TWK-CA" # TWK-CA FBA-CA etc.
+remainr_c = 37 # column number for regional remain in Pcs - CA, UK, DE, CN, Wholesalers
+insert_c = 42 # column number for shipment in tracking file - inserted shipment column
+ship = "CN04-DE" # S1 CN01 etc
+destination = "FBA-DE" # TWK-CA FBA-CA etc.
 
 ## To Surrey WH/Wholesalers
 ship_f = glob(os.path.join("../PO/shipment/*" + ship + "*/*" +  ship + "*.xlsx"))
@@ -413,6 +413,7 @@ for i in range(len(shipment_all)):
       print("ERROR")
   
   except: 
+    print("PO not in tracking file: append to end. ")
     r = POtrack_df.shape[0]
     POtrack1.cell(r + 1, po_c).value = shipment_all.loc[i, "PO"]
     POtrack1.cell(r + 1, sku_c).value = shipment_all.loc[i, "SKU"]
