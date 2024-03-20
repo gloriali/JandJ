@@ -65,11 +65,11 @@ write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.nam
 
 # -------- Request stock from Surrey: at request --------------------
 # input Clover > Inventory > Items > Export.
-request <- c("IHT", "SKG", "WJA", "WGS") # categories to restock
-n <- 1       # Qty per SKU to stock at Richmond
+request <- c("HCF0", "HCB0", "HCA0", "HAV0", "HBS", "HJS", "HXU", "HXP", "HXC", "UJ1", "UG1", "UV2", "UT1", "USA", "SJF", "SPW", "SKB", "SKG", "GUA", "GUX", "GBX", "GHA", "SWS") # categories to restock
+n <- 3       # Qty per SKU to stock at Richmond
 n_xoro <- 10 # min Qty in stock at Surrey to request
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(toupper(.[, "Name"])) 
+clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(toupper(.[, "Name"])) 
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
 order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
