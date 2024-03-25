@@ -42,7 +42,7 @@ rownames(catprint) <- catprint$SKU
 image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T)
 rownames(image) <- image$SKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
-categories <- products_description_cat$cat
+categories <- c("SWS")
 
 #### description and details for the new listing
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
@@ -58,7 +58,7 @@ rownames(mastersku_SPU) <- mastersku_SPU$SPU
 new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Seasons = mastersku_SPU[SPU, "Seasons.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
   filter(!(SPU %in% toupper(products_XHS$SPU)), !is.na(Image.Src))
 rownames(new_description) <- new_description$SPU
-products_description <- rbind(products_description, new_description %>% select(-Seasons))
+products_description <- rbind(products_description %>% select(-X.), new_description %>% select(-Seasons))
 write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
 # !open products_description in excel and fill in missing info
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
