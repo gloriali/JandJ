@@ -4,7 +4,7 @@
 ## Square website > Customers > Export Customers
 
 cd ~/OneDrive\ -\ Jan\ and\ Jul/TWK\ -\ Gloria/Square/
-items=$(ls items-$(date +%Y-%m-%d)*.csv); # Square website > Transactions > Export Items Detail CSV;
+items=$(ls items-*$(date +%Y-%m-%d)*.csv); # Square website > Transactions > Export Items Detail CSV;
 customers="customers.csv"; # Square website > Customers > Export Customers
 out="square2xoro-"$(date +%Y%m%d)".csv";
 
