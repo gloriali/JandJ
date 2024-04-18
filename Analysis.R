@@ -197,6 +197,11 @@ write.csv(woo_FW_discontinued, file = paste0("../Analysis/Clearance_2023FW_disco
 # ------------- Warehouse sale ------------
 defects <- xoro %>% filter(grepl("^M[A-Z][A-Z][A-Z]-", Item.), ATS > 0) %>% arrange(Item.)
 write.csv(defects, file = paste0("../Analysis/defects_", Sys.Date(), ".csv"), row.names = F, na = "")
+
+clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "Name"]))
+offline <- xoro %>% mutate(qty = clover[Item., "Quantity"], Price = clover[Item., "Price"]) %>% filter(ATS <= 0, qty > 0, !grepl("24", Seasons)) %>% arrange(Item.)
+write.csv(offline, file = paste0("../Analysis/offline_all_", Sys.Date(), ".csv"), row.names = F, na = "")
+
 inventory <- read.csv("../Analysis/Sales_Inventory_SKU_2024-04-17.csv", as.is = T)
 sales_SKU_last12month <- read.csv("../Analysis/Sales_SKU_last12month_2024-04-17.csv", as.is = T)
 monR <- read.csv("../Analysis/MonthlyRatio_2024-04-17.csv", as.is = T) %>% `row.names<-`(.[, "Category"])
