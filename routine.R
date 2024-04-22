@@ -75,6 +75,15 @@ order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 # email Shikshit
 
+# -------- Batch update Clover inventory: at request -------------
+clover_update <- read.csv("../Clover/Order04182024.csv", as.is = T) %>% mutate(Qty = 0 - Qty) %>% `row.names<-`(toupper(.[, "ItemNumber"])) 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% mutate(Quantity = ifelse(Name %in% clover_update$ItemNumber, Quantity + clover_update[Name, "Qty"], Quantity))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+
 # -------- Analysis: monthly --------------------
 new_season <- "24"   # New season contains (yr)
 qty_offline <- 3     # Qty to move to offline sales
