@@ -219,3 +219,17 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
   filter(!grepl("23", Seasons), !grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/warehouse_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
+
+# ---------- ABC show 2024 -----------
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% 
+  mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(.[, "Item."])
+clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "Name"]))
+request_SKU <- read.csv("../TradeShows/ABC2024/request_SKU20240423.csv", as.is = T) %>% mutate(SKU = toupper(SKU), qty = xoro[SKU, "ATS"], On.PO = xoro[SKU, "On.PO"], clover = clover[SKU, "Quantity"], Warehouse = ifelse(qty > 0 | On.PO > 0, "Surrey", ifelse(clover > 0, "Clover", "Sample")))
+write.csv(request_SKU, file = paste0("../TradeShows/ABC2024/Stock_Surrey", Sys.Date(), ".csv"), row.names = F) 
+ABC_surrey <- request_SKU %>% filter(Warehouse == "Surrey") %>% select(SKU) %>% arrange(SKU) %>%
+  mutate(StoreCode = "WH-JJ", ItemNumber = SKU, Qty = -1, LocationName = "BIN", UnitCost = "", ReasonCode = "SPC", Memo = "ABC trade show 2024", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "") %>% select(-SKU)
+write.csv(ABC_surrey, file = paste0("../TradeShows/ABC2024/ABC_Surrey", Sys.Date(), ".csv"), row.names = F)
+ABC_richmond <- request_SKU %>% filter(!(SKU %in% ABC_surrey$ItemNumber)) 
+write.csv(ABC_richmond, file = paste0("../TradeShows/ABC2024/ABC_Richmond", Sys.Date(), ".csv"), row.names = F)
+giveaway <- read.csv("../TradeShows/ABC2024/giveaway.csv", as.is = T) %>% mutate(qty = xoro[SKU, "ATS"], On.PO = xoro[SKU, "On.PO"])
+write.csv(giveaway, file = paste0("../TradeShows/ABC2024/giveaway", Sys.Date(), ".csv"), row.names = F)
