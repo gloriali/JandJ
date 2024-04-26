@@ -65,8 +65,8 @@ write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.nam
 
 # -------- Request stock from Surrey: at request --------------------
 # input Clover > Inventory > Items > Export.
-request <- c("UT1", "USA", "SJD", "SKG", "GUA", "GHA", "WBS", "AAA", "AJS", "AHJ", "ACB", "ACA") # categories to restock
-n <- 3       # Qty per SKU to stock at Richmond
+request <- c("AJA", "WJA", "WPF", "WJT", "UG1", "UJ1", "UT1", "USA", "UV2") # categories to restock
+n <- 2       # Qty per SKU to stock at Richmond
 n_xoro <- 10 # min Qty in stock at Surrey to request
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(toupper(.[, "Name"])) 
