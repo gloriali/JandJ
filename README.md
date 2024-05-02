@@ -12,3 +12,4 @@
 [POtracking.R](./POtracking.R): track China to global shipping PO. - discard, use python instead.   
 [FBArefill.R](./FBArefill.R): calculate FBA refill quantity for each SKU - run routinely and send to Shikshit.   
 [XHS.R](./XHS.R): create and manage listing files - generate at request.  
+[Netsuite.R](./Netsuite.R): manage Netsuite system   
