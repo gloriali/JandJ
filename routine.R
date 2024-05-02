@@ -75,6 +75,19 @@ order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 # email Shikshit
 
+# ---------------- Adjust Clover Inventory: at request --------------------
+# download current Richmond stock: clover_item > Inventory > Items > Export
+library(dplyr)
+library(openxlsx)
+adjust_inventory <- read.csv("../Clover/order04302024_receive.csv", as.is = T) %>% `row.names<-`(toupper(.[, "ItemNumber"])) 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = toupper(SKU), Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Qty"], Quantity))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+# upload to Clover > Inventory
+
 # -------- Batch update Clover inventory: at request -------------
 clover_update <- read.csv("../Clover/Order04182024.csv", as.is = T) %>% mutate(Qty = 0 - Qty) %>% `row.names<-`(toupper(.[, "ItemNumber"])) 
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
