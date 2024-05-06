@@ -14,8 +14,8 @@ colnames(inventory_update) <- gsub("\\.", " ", colnames(inventory_update))
 write.csv(inventory_update, file = paste0("../NetSuite/inventory_update-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
 
 # ------------- upload Clover SO ---------------------------
-clover_so <- read.csv("../Clover/LineItemsExport-20240502_0000_PDT-20240502_2359_PDT.csv", as.is = T) 
+clover_so <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "LineItemsExport-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
 netsuite_so <- clover_so %>% filter(Item.SKU != "", Order.Payment.State == "Paid") %>% mutate(Order.date = format(as.Date(gsub(" .*", "", Line.Item.Date), "%d-%b-%Y"), "%m/%d/%Y")) %>% group_by(Order.date) %>% 
-  mutate(ID = data.table::rleid(Order.ID), REF.ID = paste0("POP", format(as.Date(Order.date, "%m/%d/%Y"), "%Y%m%d"), "-", sprintf("%02d", ID)), Order.Type = "JJR OFFLINE", Department = "Retail : Store Richmond", Warehouse = "WH-Richmond", Quantity = 1, Price.level = "Custom", Rate = Item.Revenue, Amount = Item.Total, Coupon.Discount = Total.Discount + Order.Discount.Proportion, Coupon.Code = gsub(" -.*","", paste0(Order.Discounts, Discounts)), Tax.Code = ifelse(Item.Tax.Rate == 0.05, "CA-BC-GST", ifelse(Item.Tax.Rate == 0.12, "CA-BC-TAX", ""))) %>% 
-  select(Order.date, REF.ID, Order.Type, Department, Warehouse, Order.ID, Item.SKU, Quantity, Price.level, Rate, Amount, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount)
+  mutate(Closed = T, ID = data.table::rleid(Order.ID), REF.ID = paste0("POP", format(as.Date(Order.date, "%m/%d/%Y"), "%Y%m%d"), "-", sprintf("%02d", ID)), Order.Type = "JJR OFFLINE", Department = "Retail : Store Richmond", Warehouse = "WH-Richmond", Quantity = 1, Price.level = "Custom", Rate = Item.Revenue, Amount = Item.Total, Coupon.Discount = Total.Discount + Order.Discount.Proportion, Coupon.Code = gsub("NA", "", gsub(" -.*","", paste0(Order.Discounts, Discounts))), Tax.Code = ifelse(Item.Tax.Rate == 0.05, "CA-BC-GST", ifelse(Item.Tax.Rate == 0.12, "CA-BC-TAX", ""))) %>% 
+  select(Closed, Order.date, REF.ID, Order.Type, Department, Warehouse, Order.ID, Item.SKU, Quantity, Price.level, Rate, Amount, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount)
 write.csv(netsuite_so, file = paste0("../NetSuite/SO-clover-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
