@@ -51,7 +51,7 @@ customer <- read.csv(list.files(path = "../Clover/", pattern = paste0("Customers
   mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "") %>% `row.names<-`(.[, "Name"])
 payments <- read.csv(list.files(path = "../Clover/", pattern = paste0("Payments-", format(Sys.Date(), "%Y%m%d")), full.names = T), as.is = T) %>% 
   mutate(email = customer[Customer.Name, "Email.Address"], Refund.Amount = ifelse(is.na(Refund.Amount), 0, as.numeric(Refund.Amount))) %>% filter(!is.na(email))
-point <- data.frame(Email = payments$email, Points = as.integer(payments$Amount - payments$Refund.Amount))
+point <- data.frame(Email = payments$email, Points = as.integer(payments$Amount - payments$Refund.Amount)) %>% filter(Points != 0, !is.na(Email))
 # customer info: Square > Customers > Export customers
 # sales: Square > Transactions > select dates > Export Transactions CSV
 square_customer <- read.csv("../Square/customers.csv", as.is = T) %>% `row.names<-`(.[, "Square.Customer.ID"]) 
