@@ -54,7 +54,7 @@ products_description_cat <- read.xlsx2("../XHS/products_description_categories.x
 rownames(products_description_cat) <- products_description_cat$cat
 mastersku_SPU <- mastersku %>% filter(MSKU.Status == "Active") %>% filter(!duplicated(SPU))
 rownames(mastersku_SPU) <- mastersku_SPU$SPU
-new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Seasons = mastersku_SPU[SPU, "Seasons.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " - ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
+new_description <- data.frame(SPU = mastersku_SPU[mastersku_SPU$Category.SKU %in% categories, "SPU"]) %>% mutate(cat = mastersku_SPU[SPU, "Category.SKU"], Seasons = mastersku_SPU[SPU, "Seasons.SKU"], Product.Name = paste0(products_description_cat[cat, "Product.Name"], " | ", mastersku_SPU[SPU, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
   filter(!(SPU %in% toupper(products_XHS$SPU)))
 rownames(new_description) <- new_description$SPU
 products_description <- rbind(products_description, new_description %>% select(-Seasons))
