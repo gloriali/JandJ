@@ -23,6 +23,16 @@ colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
 # upload to AllValue > Products
 
+### -------- update inventory with xoro China ----------------
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("CN_Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - China") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
+wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
+openxlsx::protectWorkbook(wb, protect = F)
+openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
+products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
+products_upload <- products_XHS %>% mutate(Inventory = xoro[SKU, "ATS"])
+colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
+openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
+
 ### -------- extract and update existing descriptions -----------------
 products_description <- products_XHS %>% filter(!duplicated(SPU)) %>% mutate(SPU = toupper(SPU), cat = gsub("-.*", "", SKU), Description = paste(Description, SEO.Description, Describe), Description = str_trim(gsub("NA", "", Description))) %>% select(SPU, Product.Name, cat, Description, Categories, Option1.Name, Image.Src)
 products_description_cat <- products_description %>% select(cat, Product.Name, Description, Categories, Option1.Name) %>% filter(!duplicated(cat)) %>% mutate(Product.Name = gsub("\\s?-\\s?\\w+$", "", Product.Name))
