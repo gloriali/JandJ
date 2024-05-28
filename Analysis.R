@@ -217,8 +217,20 @@ woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("w
   select(ID, SKU, Name, Seasons, cat, SPU, Regular.price, discount, Qty) %>% `row.names<-`(.[, "SKU"])
 warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regular.price > 0) %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
-  filter(!grepl("23", Seasons), !grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
-write.csv(warehouse_sales, file = paste0("../Analysis/warehouse_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
+  filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
+write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
+## hats sales for online
+sales_SKU_thisyear <- data.frame()
+sheets <- getSheetNames(RawData)
+sheets_SKU <- sheets[grepl("-SKU$", sheets)&(!grepl("PW2", sheets))&(!grepl("WJO", sheets))&(!grepl("WPO", sheets))&(!grepl("ISJ", sheets))&(!grepl("WJS", sheets))]
+for(sheet in sheets_SKU){
+  sales_SKU_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = c(1:8), startRow = 2) %>% 
+    filter(!(Sales.Channel %in% c("Summary", "Sales Channel", "All Marketplaces"))) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
+  sales_SKU_thisyear <- rbind(sales_SKU_thisyear, sales_SKU_i)
+}
+sales_SKU_thisyearT <- sales_SKU_thisyear %>% group_by(Adjust_MSKU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
+hats_sales <- read.csv("../Analysis/hats_sales_2024-05-27.csv", as.is = T) %>% mutate(Total.2024 = sales_SKU_thisyearT[toupper(SKU), "Total.2024"])
+write.csv(hats_sales, file = "../Analysis/hats_sales_2024-05-27.csv", row.names = F)
 
 # ---------- ABC show 2024 -----------
 xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% 
