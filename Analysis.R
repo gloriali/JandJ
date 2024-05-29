@@ -229,7 +229,9 @@ for(sheet in sheets_SKU){
   sales_SKU_thisyear <- rbind(sales_SKU_thisyear, sales_SKU_i)
 }
 sales_SKU_thisyearT <- sales_SKU_thisyear %>% group_by(Adjust_MSKU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
-hats_sales <- read.csv("../Analysis/hats_sales_2024-05-27.csv", as.is = T) %>% mutate(Total.2024 = sales_SKU_thisyearT[toupper(SKU), "Total.2024"])
+sales_SKU_thisyearAMZ <- sales_SKU_thisyear %>% filter(grepl("Amazon", Sales.Channel)) %>% group_by(Adjust_MSKU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
+sales_SKU_thisyearJJ <- sales_SKU_thisyear %>% filter(grepl("janandjul", Sales.Channel)) %>% group_by(Adjust_MSKU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
+hats_sales <- read.csv("../Analysis/hats_sales_2024-05-27.csv", as.is = T) %>% mutate(Total.2024 = sales_SKU_thisyearT[toupper(SKU), "Total.2024"], Total.2024.JJ = sales_SKU_thisyearJJ[toupper(SKU), "Total.2024"], Total.2024.AMZ = sales_SKU_thisyearAMZ[toupper(SKU), "Total.2024"])
 write.csv(hats_sales, file = "../Analysis/hats_sales_2024-05-27.csv", row.names = F)
 
 # ---------- ABC show 2024 -----------
@@ -245,3 +247,26 @@ ABC_richmond <- request_SKU %>% filter(!(SKU %in% ABC_surrey$ItemNumber))
 write.csv(ABC_richmond, file = paste0("../TradeShows/ABC2024/ABC_Richmond", Sys.Date(), ".csv"), row.names = F)
 giveaway <- read.csv("../TradeShows/ABC2024/giveaway.csv", as.is = T) %>% mutate(qty = xoro[SKU, "ATS"], On.PO = xoro[SKU, "On.PO"])
 write.csv(giveaway, file = paste0("../TradeShows/ABC2024/giveaway", Sys.Date(), ".csv"), row.names = F)
+
+# ---------- best sellers ----------
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("^Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(.[, "Item."])
+mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
+sales_SKU_thisyear <- data.frame()
+sheets <- getSheetNames(RawData)
+sheets_SKU <- sheets[grepl("-SKU$", sheets)&(!grepl("PW2", sheets))&(!grepl("WJO", sheets))&(!grepl("WPO", sheets))&(!grepl("ISJ", sheets))&(!grepl("WJS", sheets))]
+for(sheet in sheets_SKU){
+  sales_SKU_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = c(1:8), startRow = 2) %>% 
+    filter(!(Sales.Channel %in% c("Summary", "Sales Channel", "All Marketplaces"))) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
+  sales_SKU_thisyear <- rbind(sales_SKU_thisyear, sales_SKU_i)
+}
+sales_SPU_thisyearT <- sales_SKU_thisyear %>% mutate(SPU = paste0(mastersku[Adjust_MSKU, "Category.SKU"], "-", mastersku[Adjust_MSKU, "Print.SKU"])) %>% group_by(SPU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "SPU"]))
+sales_SKU_thisyearT <- sales_SKU_thisyear %>% group_by(Adjust_MSKU) %>% summarise(Total.2024 = sum(Total.2024)) %>% as.data.frame() %>% mutate(Category = mastersku[Adjust_MSKU, "Category.SKU"], SPU = paste0(mastersku[Adjust_MSKU, "Category.SKU"], "-", mastersku[Adjust_MSKU, "Print.SKU"]), Total.2024.SPU = sales_SPU_thisyearT[SPU, "Total.2024"], ATS = xoro[Adjust_MSKU, "ATS"]) %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
+categories <- c("GBX", "GHA", "GUA", "GUX")
+TopSeller_sunglasses <- sales_SKU_thisyearT %>% filter(Category %in% categories) %>% arrange(-Total.2024.SPU)
+write.csv(TopSeller_sunglasses, file = paste0("../Analysis/TopSeller_sunglasses_", Sys.Date(), ".csv"), row.names = F)
+categories <- c("SPW", "SKB", "SKG", "SWS")
+TopSeller_shoes <- sales_SKU_thisyearT %>% filter(Category %in% categories) %>% arrange(Category, -Total.2024.SPU)
+write.csv(TopSeller_shoes, file = paste0("../Analysis/TopSeller_shoes_", Sys.Date(), ".csv"), row.names = F)
+categories <- c("HAD0", "HAV0", "HBS", "HCA0", "HCB0", "HCF0", "HJP", "HJS", "HXC", "HXP", "HXU")
+TopSeller_hats <- sales_SKU_thisyearT %>% filter(Category %in% categories) %>% arrange(-Total.2024.SPU)
+write.csv(TopSeller_hats, file = paste0("../Analysis/TopSeller_hats_", Sys.Date(), ".csv"), row.names = F)
