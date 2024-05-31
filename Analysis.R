@@ -141,6 +141,14 @@ write.csv(bulk_dead_SS, file = paste0("../Analysis/bulk_dead_SS_", Sys.Date(), "
 bulk_dead_FW <- discontinued %>% filter(!(grepl("S", Seasons)), time_yrs > 1, Qty > 500)
 write.csv(bulk_dead_FW, file = paste0("../Analysis/bulk_dead_FW_", Sys.Date(), ".csv"), row.names = F)
 
+# ------------- Discontinued limit sizes ------------- 
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% filter(Published == 1, !is.na(Regular.price)) %>% filter(!duplicated(SKU), SKU != "") %>% 
+  mutate(SKU = toupper(SKU), Qty = xoro[SKU, "ATS"], Seasons = ifelse(SKU %in% mastersku$MSKU, mastersku[SKU, "Seasons.SKU"], mastersku_adjust[SKU, "Seasons.SKU"]), discount = ifelse(is.na(Sale.price), 0, (Regular.price - Sale.price)/Regular.price), cat = mastersku[SKU, "Category.SKU"], SPU = gsub("(\\w+-\\w+)-.*", "\\1", SKU)) %>% 
+  select(ID, SKU, Name, Seasons, cat, SPU, Regular.price, discount, Qty) %>% `row.names<-`(.[, "SKU"])
+sizes_all <- woo %>% count(SPU) %>% mutate(cat = gsub("-.*", "", SPU)) %>% group_by(cat) %>% summarize(n_all = max(n)) %>% as.data.frame() %>% `row.names<-`(.[, "cat"])
+size_limited <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regular.price > 0) %>% count(SPU) %>% mutate(cat = gsub("-.*", "", SPU), n_all = sizes_all[cat, "n_all"]) %>% filter(n != n_all)
+write.csv(size_limited, file = paste0("../Analysis/size_limited_", Sys.Date(), ".csv"), row.names = F)
+
 # ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
 sheets_cat <- sheets[!grepl("-", sheets)&!grepl("Sale", sheets)]
