@@ -7,6 +7,8 @@ library(xlsx)
 new_season <- "24"   # New season contains (yr)
 qty_offline <- 3     # Qty to move to offline sales
 month <- format(Sys.Date(), "%m")
+monthSS <- c("Month03", "Month04", "Month05", "Month06", "Month07", "Month08")
+monthFW <- c("Month09", "Month10", "Month11", "Month12", "Month01", "Month02")
 if(month %in% c("09", "10", "11", "12", "01", "02")){in_season <- "F"}else(in_season <- "S")
 RawData <- list.files(path = "../FBArefill/Raw Data File/", pattern = "All Marketplace All SKU Categories", full.names = T)
 mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
@@ -126,6 +128,18 @@ Sales_Inv_Next4m_SPU <- Sales_Inv_Next4m %>% group_by(SPU) %>% summarise(Enough_
 Sales_Inv_Next4m <- Sales_Inv_Next4m %>% mutate(Enough_Inv_SPU = paste0(as.character(as.integer(Sales_Inv_Next4m_SPU[SPU, "Enough_Inv"]*100)), "%")) %>% filter(grepl(new_season, Seasons), Status == "Active", !Enough_Inv)
 write.csv(Sales_Inv_Next4m, file = paste0("../Analysis/OOS_Next4m_", Sys.Date(), ".csv"), row.names = F)
 # Discuss with Mei, Florence, Cindy and Matt
+
+# ------------- Bulk dead inventory ------------- 
+#sales_SKU_last12month <- read.csv("../Analysis/Sales_SKU_last12month_2024-01-31.csv", as.is = T)
+sales_SPU_last12month <- sales_SKU_last12month %>% mutate(SPU = paste0(mastersku[Adjust_MSKU, "Category.SKU"], "-", mastersku[Adjust_MSKU, "Print.SKU"]), T.SS = rowSums(across(all_of(monthSS))), T.FW = rowSums(across(all_of(monthFW)))) %>% group_by(SPU) %>% summarise(T.SS = sum(T.SS), T.FW = sum(T.FW)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% filter(Published == 1, !is.na(Regular.price)) %>% filter(!duplicated(SKU), SKU != "") %>% 
+  mutate(SKU = toupper(SKU), Qty = xoro[SKU, "ATS"], Seasons = ifelse(SKU %in% mastersku$MSKU, mastersku[SKU, "Seasons.SKU"], mastersku_adjust[SKU, "Seasons.SKU"]), discount = ifelse(is.na(Sale.price), 0, (Regular.price - Sale.price)/Regular.price), cat = mastersku[SKU, "Category.SKU"], SPU = gsub("(\\w+-\\w+)-.*", "\\1", SKU)) %>% 
+  select(ID, SKU, Name, Seasons, cat, SPU, Regular.price, discount, Qty) %>% `row.names<-`(.[, "SKU"])
+discontinued <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regular.price > 0) %>% group_by(SPU) %>% summarise(Seasons = Seasons[1], Qty = sum(Qty)) %>% mutate(sales.SS = ifelse(SPU %in% sales_SPU_last12month$SPU, sales_SPU_last12month[SPU, "T.SS"], 0), sales.FW = ifelse(SPU %in% sales_SPU_last12month$SPU, sales_SPU_last12month[SPU, "T.FW"], 0), time_yrs = Qty/(sales.SS + sales.FW))
+bulk_dead_SS <- discontinued %>% filter(!(grepl("F", Seasons)), time_yrs > 1, Qty > 500)
+write.csv(bulk_dead_SS, file = paste0("../Analysis/bulk_dead_SS_", Sys.Date(), ".csv"), row.names = F)
+bulk_dead_FW <- discontinued %>% filter(!(grepl("S", Seasons)), time_yrs > 1, Qty > 500)
+write.csv(bulk_dead_FW, file = paste0("../Analysis/bulk_dead_FW_", Sys.Date(), ".csv"), row.names = F)
 
 # ------------- summarize raw sales data ------------- 
 sheets <- getSheetNames(RawData)
