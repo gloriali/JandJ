@@ -241,8 +241,36 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
   filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
-
-warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-03.csv", as.is = T) %>% mutate(ATS = xoro[SKU, "ATS"])
+### setup clover
+price_deal <- data.frame(Name = c("MSWS", "MISC5", "MISC10", "MISC15", "MISC20", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK"), Price = c("25.00", "5.00", "10.00", "15.00", "20.00", "30.00", "35.00", "40.00", "40.00", "25.00", "50.00", "40.00", "30.00", "25.00", "60.00", "55.00", "30.00")) %>% `row.names<-`(.[, "Name"])
+warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% 
+  mutate(Price = ifelse(Name %in% warehouse_sales$SKU, warehouse_sales[Name, "Sales.price"], Price), Price = ifelse(Name %in% price_deal$Name, price_deal[Name, "Price"], Price), Price = ifelse(grepl("SSS", Name), "10.00", Price), Price = ifelse(grepl("SSW", Name), "10.00", Price), Price.Type = ifelse(is.na(Price), "Variable", "Fixed")) %>% `row.names<-`(.[, "Name"])
+defective <- warehouse_sales %>% filter(Type == "Defective") %>% mutate(Original = gsub("^M", "", SKU), Product.Code = clover_item[Original, "Product.Code"])
+clover_new <- data.frame(Clover.ID = "", Name = defective$SKU, Alternate.Name = "", Price = defective$Sales.price, Price.Type = "Fixed", Price.Unit = "", Tax.Rates = "GST", Cost = 0, Product.Code = defective$Product.Code, SKU = defective$SKU, Modifier.Groups = "", Quantity = 0, Printer.Labels = "", Hidden = "No", Non.revenue.item = "No") 
+clover_new <- clover_new %>% rename_with(~ gsub("Non.revenue.item", "Non-revenue.item", colnames(clover_new)))
+clover_item <- rbind(clover_item, clover_new) %>% mutate(Product.Code = ifelse(Name %in% defective$Original, "", Product.Code))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+### refill
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
+warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% `row.names<-`(.[, "Name"])
+order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Name %in% warehouse_sales$SKU, Quantity < 10))$Name, Qty = 20 - clover_item[(clover_item %>% filter(Name %in% warehouse_sales$SKU, Quantity < 10))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
+order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > Qty) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
+write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
+### clover receive stock
+warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% `row.names<-`(.[, "SKU"])
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% mutate(Quantity = ifelse(Name %in% warehouse_sales$SKU, Quantity + warehouse_sales[Name, "Qty"], Quantity))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 
 ## hats sales for online
 sales_SKU_thisyear <- data.frame()
