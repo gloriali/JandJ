@@ -241,6 +241,9 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
   filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
+
+warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-03.csv", as.is = T) %>% mutate(ATS = xoro[SKU, "ATS"])
+
 ## hats sales for online
 sales_SKU_thisyear <- data.frame()
 sheets <- getSheetNames(RawData)
