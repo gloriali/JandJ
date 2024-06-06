@@ -242,7 +242,7 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
 ### setup clover
-price_deal <- data.frame(Name = c("MSWS", "MISC5", "MISC10", "MISC15", "MISC20", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK"), Price = c("25.00", "5.00", "10.00", "15.00", "20.00", "30.00", "35.00", "40.00", "40.00", "25.00", "50.00", "40.00", "30.00", "25.00", "60.00", "55.00", "30.00")) %>% `row.names<-`(.[, "Name"])
+price_deal <- read.csv("../Analysis/price_deal.csv", as.is = T) %>% `row.names<-`(.[, "SKU"])
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- openxlsx::readWorkbook(clover, "Items") %>% 
@@ -255,14 +255,29 @@ clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_it
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
 writeData(clover, sheet = "Items", clover_item)
 openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
-### refill
+### setup square
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(toupper(.[, "SKU"])) 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items")
+square_upload <- data.frame(Token = "", ItemName = clover_item$Name, ItemType = "", VariationName = "Regular", SKU = clover_item$Name, Description = "", Category = "", Price = clover_item$Price, PriceRichmond = "", PriceSurrey = "", NewQuantityRichmond = 0, NewQuantitySurrey = 0, EnabledRichmond = "Y", CurrentQuantityRichmond = "", CurrentQuantitySurrey = "", StockAlertEnabledRichmond = "N", StockAlertCountRichmond = 0, EnabledSurrey = "Y", StockAlertEnabledSurrey = "N", StockAlertCountSurrey = 0, SEOTitle = "",	SEODescription = "",	Permalink = "", SquareOnlineItemVisibility = "UNAVAILABLE",	ShippingEnabled = "",	SelfserveOrderingEnabled = "",	DeliveryEnabled = "",	PickupEnabled = "", Sellable = "Y",	Stockable = "Y",	SkipDetailScreeninPOS = "",	OptionName1 = "",	OptionValue1 = "") %>% 
+  mutate(TaxPST = ifelse(woo[SKU, "Tax.class"] == "full", "Y", "N"), TaxPST = ifelse(is.na(TaxPST), "N", TaxPST))
+write.table(square_upload, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), sep = ",", row.names = F, col.names = c(colnames(square_upload)[1:ncol(square_upload)-1], "Tax - PST (7%)"), na = "")
+### update clover with square sales and refill
 xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
+square <- read.csv(list.files(path = "../Square/", pattern = paste0("catalog-", format(Sys.Date(), "%Y-%m-%d")), full.names = T), as.is = T) %>% `row.names<-`(toupper(.[, "SKU"])) 
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- openxlsx::readWorkbook(clover, "Items") %>% `row.names<-`(.[, "Name"])
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% mutate(Quantity = Quantity + Current.Quantity.Richmond + Current.Quantity.Surrey) %>% `row.names<-`(.[, "Name"])
 order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Name %in% warehouse_sales$SKU, Quantity < 10))$Name, Qty = 20 - clover_item[(clover_item %>% filter(Name %in% warehouse_sales$SKU, Quantity < 10))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
 order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > Qty) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+square_upload <- square %>% mutate(New.Quantity.Richmond = 0, New.Quantity.Surrey = 0)
+write.table(square_upload, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), sep = ",", row.names = F, col.names = c(colnames(square)[1:ncol(square)-1], "Tax - PST (7%)"), na = "")
 ### clover receive stock
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% `row.names<-`(.[, "SKU"])
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
