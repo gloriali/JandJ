@@ -244,12 +244,12 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
   filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
-### restock WJA, WPS, WSF
+### restock WJA, WPS, WJT, WMT
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
-warehouse_sales_new <- data.frame(Type = "Discontinued", SKU = c((xoro %>% filter(!grepl("24", Seasons), grepl("^WJA-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WPS-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-DNL", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-TRZ", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KEH-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KEH-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KMT-", Item.), ATS > 0))$Item.)) %>% 
-  mutate(Sales.price = ifelse(grepl("WJA", SKU), 50, 25), Sales.price = ifelse(grepl("^K", SKU), 10, Sales.price), Sales.price = ifelse(grepl("^BRC", SKU), 30, Sales.price), Surrey_Qty = xoro[SKU, "ATS"], Qty_transfer = 0)
-warehouse_sales <- rbind(warehouse_sales, warehouse_sales_new) %>% mutate(Seasons = mastersku[SKU, "Seasons"])
-write.csv(warehouse_sales, file = "../Analysis/warehouse_sales_2024-06-04.csv", row.names = F, na = "")
+warehouse_sales_new <- data.frame(Type = "Discontinued", SKU = c((xoro %>% filter(!grepl("24", Seasons), grepl("^WMT-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WJA-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WJT-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WPS-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-DNL", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-TRZ", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KEH-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KMT-", Item.), ATS > 0))$Item.)) %>% 
+  mutate(Sales.price = ifelse(grepl("WJA", SKU), 50, 25), Sales.price = ifelse(grepl("^WMT", SKU), 15, Sales.price), Sales.price = ifelse(grepl("^K", SKU), 10, Sales.price), Sales.price = ifelse(grepl("^BRC", SKU), 30, Sales.price), Sales.price = ifelse(grepl("^WJT", SKU), 45, Sales.price), Surrey_Qty = xoro[SKU, "ATS"], Seasons = mastersku[SKU, "Seasons"], Qty_transfer = 0)
+warehouse_sales <- rbind(warehouse_sales, warehouse_sales_new) %>% mutate(Seasons = mastersku[SKU, "Seasons"]) %>% mutate(Surrey_Qty = xoro[SKU, "ATS"], Clover_Qty = clover_item[SKU, "Quantity"]) %>% filter(Surrey_Qty > 0)
+write.csv(warehouse_sales, file = "../Analysis/warehouse_sales_2024-06-12.csv", row.names = F, na = "")
 ### setup clover and square
 price_deal <- read.csv("../Analysis/price_deal.csv", as.is = T) %>% `row.names<-`(.[, "SKU"])
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
