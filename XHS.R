@@ -51,7 +51,7 @@ rownames(catprint) <- catprint$SKU
 image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T)
 rownames(image) <- image$SKU
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
-categories <- c("SPW")
+categories <- c("BSL")
 
 #### description and details for the new listing
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
