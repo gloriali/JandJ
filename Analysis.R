@@ -32,6 +32,7 @@ for(sheet in sheets){
   inventory <- rbind(inventory, inventory_i)
 }
 inventory[is.na(inventory)] <- 0
+inventory <- inventory %>% rename("Inv_Total_End.WK" = "Inv_Total_End.WK.(Not.Inc..CN)")
 write.csv(inventory, file = paste0("../Analysis/Sales_Inventory_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
 inventory_s <- inventory %>% count(Adjust_MSKU, wt = Inv_Total_End.WK) %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
 qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(MSKU = toupper(MSKU), Inv_clover = clover[MSKU, "Quantity"], Inv_Total_EndWK = inventory_s[MSKU, "n"]) %>% 
@@ -221,7 +222,7 @@ woo_FW_discontinued[is.na(woo_FW_discontinued$Suggest_discount), ] <- woo_FW_dis
 write.csv(woo_FW_discontinued, file = paste0("../Analysis/Clearance_2023FW_discontinued_", Sys.Date(), ".csv"), row.names = F, na = "")
 
 # ------------- Warehouse sale ------------
-defects <- xoro %>% filter(grepl("^M[A-Z][A-Z][A-Z]-", Item.), ATS > 0) %>% arrange(Item.)
+defects <- xoro %>% filter(grepl("^M[A-Z][A-Z][A-Z]-", Item.), ATS > 5) %>% arrange(Item.)
 write.csv(defects, file = paste0("../Analysis/defects_", Sys.Date(), ".csv"), row.names = F, na = "")
 
 clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "Name"]))
@@ -245,6 +246,12 @@ warehouse_sales <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
   filter(!grepl("24", Seasons), time_yrs > 1.5) %>% select(SKU, Name, Seasons, Regular.price, discount, Qty, time_yrs) %>% arrange(SKU)
 write.csv(warehouse_sales, file = paste0("../Analysis/hat_sales_", Sys.Date(), ".csv"), row.names = F, na = "")
+### list of items to sell for TJX
+TJX <- woo %>% filter(!grepl(new_season, Seasons), Qty > 5, Regular.price > 0) %>% mutate(Wholesale.price = round(Regular.price/2, 2), Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
+  filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), digits = 1)) %>%
+  filter(!grepl("24", Seasons), time_yrs >= 4) %>% select(SKU, Name, Seasons, Regular.price, Wholesale.price, Qty, time_yrs) %>% arrange(SKU)
+write.csv(TJX, file = paste0("../Analysis/TJX_", Sys.Date(), ".csv"), row.names = F, na = "")
+
 ### restock WJA, WPS, WJT, WMT
 warehouse_sales <- read.csv("../Analysis/warehouse_sales_2024-06-04.csv", as.is = T) %>% mutate(Sales.price = gsub("\\$", "", Sales.price)) %>% `row.names<-`(.[, "SKU"])
 warehouse_sales_new <- data.frame(Type = "Discontinued", SKU = c((xoro %>% filter(!grepl("24", Seasons), grepl("^WMT-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WJA-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WJT-", Item.), ATS > 0))$Item., (xoro %>% filter(!grepl("24", Seasons), grepl("^WPS-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-DNL", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^BRC-TRZ", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KEH-", Item.), ATS > 0))$Item., (xoro %>% filter(grepl("^KMT-", Item.), ATS > 0))$Item.)) %>% 
