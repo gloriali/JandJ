@@ -5,15 +5,16 @@ library(scales)
 library(ggplot2)
 library(xlsx)
 library(readr)
-netsuite <- xlsx::read.xlsx(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".xls"), full.names = T), sheetIndex = 1, startRow = 7, header = F, fillMergedCells = T)
+library(readxl)
+netsuite <- read_xls(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".xls"), full.names = T), sheet = 1, skip = 7)
 
 # ------------- upload Richmond inventory ---------------------------
 netsuite_items <- read.csv("../NetSuite/Items531.csv", as.is = T)
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-inventory_update <- openxlsx::readWorkbook(clover, "Items") %>% filter(SKU %in% netsuite_items$MSKU, Quantity > 0) %>% mutate(Item = SKU, Adjust.Qty.By = Quantity, BIN = "BIN", Reason.Code = "Found Inventory", MEMO = "Inventory Upload", Location = "WH-RICHMOND", External.ID = paste0("IAR", format(Sys.Date(), "%y%m%d"))) %>%
+inventory_update <- openxlsx::readWorkbook(clover, "Items") %>% filter(SKU %in% netsuite_items$MSKU, Quantity > 0) %>% mutate(Item = SKU, Adjust.Qty.By = Quantity, BIN = "BIN", Reason.Code = "Found Inventory", MEMO = "Inventory Upload", Location = "WH-RICHMOND", External.ID = paste0("IA", format(Sys.Date(), "%y%m%d"))) %>%
   select(Item, Adjust.Qty.By, Quantity, BIN, Reason.Code, MEMO, Location, External.ID)
 colnames(inventory_update) <- gsub("\\.", " ", colnames(inventory_update))
-write.csv(inventory_update, file = paste0("../NetSuite/inventory_update-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
+write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
 
 # ------------- upload Clover SO ---------------------------
 customer <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Customers-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>%
@@ -28,9 +29,10 @@ write.csv(netsuite_so, file = paste0("../NetSuite/SO-clover-", format(Sys.Date()
 # ------------- upload Square SO ---------------------------
 customer <- read.csv("../Square/customers.csv", as.is = T) %>% `row.names<-`(.[, "Square.Customer.ID"])
 payments <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "transactions-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "Payment.ID"])
-square_so <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "items-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% mutate(Cash = payments[Payment.ID, "Cash"], Recipient.Email = customer[Customer.ID, "Email.Address"], Recipient.Phone = customer[Customer.ID, "Phone.Number"])
+square_so <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "items-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
+  mutate(Cash = payments[Payment.ID, "Cash"], Recipient.Email = ifelse(is.na(Customer.ID), "", customer[Customer.ID, "Email.Address"]), Recipient.Phone = ifelse(is.na(Customer.ID), "", customer[Customer.ID, "Phone.Number"]))
 netsuite_so <- square_so %>% filter(Item != "") %>% mutate(Order.date = format(as.Date(Date, "%Y-%m-%d"), "%m/%d/%Y")) %>% group_by(Order.date) %>% 
-  mutate(Payment.Option = ifelse(Cash == "$0.00", "Square", "Cash"), Class = "FBM : CA", MEMO = "Square sales", BIN = "BIN", Customer = ifelse(Location == "Surrey", "15145 JJR SHOPS", "15139 JJR SHOPR"), Recipient = Customer.Name, Order.ID = Transaction.ID, Item.SKU = Item, ID = data.table::rleid(Order.ID), REF.ID = paste0("SQ", format(as.Date(Order.date, "%m/%d/%Y"), "%Y%m%d"), "-", sprintf("%02d", ID)), Order.Type = ifelse(Location == "Surrey", "JJR SHOPS", "JJR SHOPR"), Department = ifelse(Location == "Surrey", "Retail : Store Surrey", "Retail : Store Richmond"), Warehouse = ifelse(Location == "Surrey", "WH-SURREY", "WH-RICHMOND"), Quantity = Qty, Price.level = "Custom", Coupon.Discount = as.numeric(gsub("\\$", "", Discounts)), Coupon.Discount = ifelse(Coupon.Discount == 0, "", Coupon.Discount), Coupon.Code = "", Tax = as.numeric(gsub("\\$", "", Tax)), Rate = round(as.numeric(gsub("\\$", "", Net.Sales))/Qty, 2), Tax.Code = ifelse(round(Tax/as.numeric(gsub("\\$", "", Net.Sales)), 2) == 0.05, "CA-BC-GST", ifelse(round(Tax/Net.Sales, 2) == 0.12, "CA-BC-TAX", "")), Tax.Amount = Tax) %>% 
+  mutate(Payment.Option = ifelse(Cash == "$0.00" | is.na(Cash), "Square", "Cash"), Class = "FBM : CA", MEMO = "Square sales", BIN = "BIN", Customer = ifelse(Location == "Surrey", "15145 JJR SHOPS", "15139 JJR SHOPR"), Recipient = ifelse(is.na(Customer.Name), "", Customer.Name), Order.ID = Transaction.ID, Item.SKU = Item, ID = data.table::rleid(Order.ID), REF.ID = paste0("SQ", format(as.Date(Order.date, "%m/%d/%Y"), "%Y%m%d"), "-", sprintf("%02d", ID)), Order.Type = ifelse(Location == "Surrey", "JJR SHOPS", "JJR SHOPR"), Department = ifelse(Location == "Surrey", "Retail : Store Surrey", "Retail : Store Richmond"), Warehouse = ifelse(Location == "Surrey", "WH-SURREY", "WH-RICHMOND"), Quantity = Qty, Price.level = "Custom", Coupon.Discount = as.numeric(gsub("\\$", "", Discounts)), Coupon.Discount = ifelse(Coupon.Discount == 0, "", Coupon.Discount), Coupon.Code = "", Tax = as.numeric(gsub("\\$", "", Tax)), Rate = round(as.numeric(gsub("\\$", "", Net.Sales))/Qty, 2), Tax.Code = ifelse(round(Tax/as.numeric(gsub("\\$", "", Net.Sales)), 2) == 0.05, "CA-BC-GST", ifelse(round(Tax/as.numeric(gsub("\\$", "", Net.Sales)), 2) == 0.12, "CA-BC-TAX", "")), Tax.Amount = Tax) %>% 
   select(Payment.Option, Class, Order.date, REF.ID, Order.Type, Department, Warehouse, MEMO, Order.ID, Item.SKU, Quantity, BIN, Price.level, Rate, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount, Customer, Recipient, Recipient.Phone, Recipient.Email)
 write.csv(netsuite_so, file = paste0("../NetSuite/SO-square-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
 
