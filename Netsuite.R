@@ -4,17 +4,21 @@ library(openxlsx)
 library(scales)
 library(ggplot2)
 library(xlsx)
-library(readr)
-library(readxl)
-netsuite <- read_xls(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".xls"), full.names = T), sheet = 1, skip = 7)
+library(data.table)
+netsuite_R <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 25:31)) %>% `row.names<-`(.[, "V1"])
+netsuite_R[netsuite_R == "" | is.na(netsuite_R)] <- 0
+netsuite_R[, 2:8] <- lapply(netsuite_R[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
+netsuite_S <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 32:38)) %>% `row.names<-`(.[, "V1"])
+netsuite_S[netsuite_S == "" | is.na(netsuite_S)] <- 0
+netsuite_S[, 2:8] <- lapply(netsuite_S[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
 
-# ------------- upload Richmond inventory ---------------------------
-netsuite_items <- read.csv("../NetSuite/Items531.csv", as.is = T)
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-inventory_update <- openxlsx::readWorkbook(clover, "Items") %>% filter(SKU %in% netsuite_items$MSKU, Quantity > 0) %>% mutate(Item = SKU, Adjust.Qty.By = Quantity, BIN = "BIN", Reason.Code = "Found Inventory", MEMO = "Inventory Upload", Location = "WH-RICHMOND", External.ID = paste0("IA", format(Sys.Date(), "%y%m%d"))) %>%
-  select(Item, Adjust.Qty.By, Quantity, BIN, Reason.Code, MEMO, Location, External.ID)
+# ------------- update Richmond inventory ---------------------------
+clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name != "") %>% `row.names<-`(.[, "Name"])
+inventory_update <- netsuite_R %>% filter(grepl("\\w+\\-.+", V1)) %>% 
+  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), Item = V1, Adjust.Qty.By = ifelse(V1 %in% clover_item$Name, clover_item[V1, "Quantity"], 0) - `On Hand`, Quantity = Adjust.Qty.By, BIN = "BIN", Reason.Code = "Cycle Counting", MEMO = "Inventory Update", Location = "WH-RICHMOND", External.ID = paste0("IA-", format(Sys.Date(), "%y%m%d"))) %>%
+  select(Date, Item, Adjust.Qty.By, Quantity, BIN, Reason.Code, MEMO, Location, External.ID) %>% filter(Quantity != 0)
 colnames(inventory_update) <- gsub("\\.", " ", colnames(inventory_update))
-write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
+write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
 
 # ------------- upload Clover SO ---------------------------
 customer <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Customers-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>%
