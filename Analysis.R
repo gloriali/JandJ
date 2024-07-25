@@ -390,3 +390,11 @@ write.csv(TopSeller_shoes, file = paste0("../Analysis/TopSeller_shoes_", Sys.Dat
 categories <- c("HAD0", "HAV0", "HBS", "HCA0", "HCB0", "HCF0", "HJP", "HJS", "HXC", "HXP", "HXU")
 TopSeller_hats <- sales_SKU_thisyearT %>% filter(Category %in% categories) %>% arrange(-Total.2024.SPU)
 write.csv(TopSeller_hats, file = paste0("../Analysis/TopSeller_hats_", Sys.Date(), ".csv"), row.names = F)
+
+# ----------- Always on sale -------------
+xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("^Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(.[, "Item."])
+woo_old <- read.csv("../woo/wc-product-export-17-6-2024-1718640775225.csv", as.is = T) %>% filter(SKU != "") %>% `row.names<-`(.[, "SKU"])
+clearance <- read.csv("../Analysis/Retail JJ Deals set to end on 2030.csv", as.is = T) %>% 
+  mutate(old.price = woo_old[SKU, "Sale.price"], qty = ifelse(SKU %in% xoro$Item., xoro[SKU, "ATS"], 0), Sale.price = ifelse(is.na(Sale.price), old.price, Sale.price), discount = ifelse(is.na(Sale.price), 0, round((Regular.price - Sale.price)/Regular.price, 2)))
+write.csv(clearance, file = "../Analysis/Retail JJ Deals set to end on 2030.csv", row.names = F, na = "")
+
