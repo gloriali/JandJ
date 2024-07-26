@@ -203,12 +203,12 @@ for(group in unique(sales_cat_last12month$Category.Group)){
   cat_sales_annual <- sales_cat_last12month %>% filter(Category.Group == group) %>% select(Cat_SKU, contains("Total")) %>% 
     pivot_longer(!Cat_SKU, names_to = "Year", values_to = "Sales") %>% mutate(Year = gsub("Total\\.", "", Year))
   cat_sales_annual_plot <- ggplot(cat_sales_annual, aes(Year, Sales, color = Cat_SKU, group = Cat_SKU)) + geom_point() + geom_line() + 
-    labs(title = paste0(group, "\nSales for the last 4 years"), color = "") + xlab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+    labs(title = paste0(group, "\nSales for the last 4 years"), color = "") + xlab("") + ylab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5))
   cat_sales_monthly <- sales_cat_last12month %>% filter(Category.Group == group) %>% select(-contains("Total"), -Category.Group) %>% 
     pivot_longer(!Cat_SKU, names_to = "Month", values_to = "Sales") %>% mutate(Month = factor(Month, levels = Month[1:12]))
   cat_sales_monthly_plot <- ggplot(cat_sales_monthly, aes(Month, Sales, color = Cat_SKU, group = Cat_SKU)) + geom_point() + geom_line() + 
     labs(title = paste0(group, "\nSales for the last 12 months"), color = "") + xlab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5)) + guides(color = "none")
-  grid.arrange(cat_sales_monthly_plot, cat_sales_annual_plot, ncol = 2)
+  grid.arrange(cat_sales_monthly_plot, cat_sales_annual_plot, ncol = 2, widths = c(3, 2))
 }
 dev.off()
 
