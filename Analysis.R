@@ -3,7 +3,9 @@ library(dplyr)
 library(openxlsx)
 library(scales)
 library(ggplot2)
+library(tidyr)
 library(xlsx)
+library(gridExtra)
 new_season <- "24"   # New season contains (yr)
 qty_offline <- 3     # Qty to move to offline sales
 month <- format(Sys.Date(), "%m")
@@ -60,6 +62,8 @@ for(sheet in sheets){
 }
 sales_SKU_last12month <- sales_SKU_last12month %>% rename(all_of(names)) %>% select(Sales.Channel, Adjust_MSKU, Month01:Month12) %>% mutate(across(Month01:Month12, ~as.numeric(.))) %>% mutate(across(as.name(paste0("Month", month)), ~round(./date, 0)))
 write.csv(sales_SKU_last12month, file = paste0("../Analysis/Sales_SKU_last12month_", Sys.Date(), ".csv"), row.names = F)
+sales_cat_last12month <- sales_cat_last12month %>% select(-(1:5))
+write.csv(sales_cat_last12month, file = paste0("../Analysis/Sales_categories_last12month_", Sys.Date(), ".csv"), row.names = F)
 if(month %in% c("01")){
   monR <- monR_last_yr %>% select(Category, Month01:Month12) %>% `row.names<-`(toupper(.[, "Category"]))
 }else{
@@ -188,6 +192,25 @@ for(sheet in sheets_SKU){
 }
 sales_SKU <- sales_SKU %>% filter(Total.2023 > 0) %>% filter(!duplicated(Adjust_MSKU))
 write.csv(sales_SKU, file = paste0("../Analysis/Sales2023_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
+
+# ----------- Sales trend -------------
+categories <- read.csv("../Analysis/Categories.csv", as.is = T) %>% `row.names<-`(.[, "Category.SKU"])
+mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
+sales_cat_last12month <- read.csv(rownames(file.info(list.files(path = "../Analysis/", pattern = "Sales_categories_last12month_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "Cat_SKU"]) %>% 
+  mutate(Category.Group = categories[Cat_SKU, "Category.Group"]) %>% filter(!is.na(Category.Group), Cat_SKU %in% (mastersku %>% filter(grepl("2[34]", Seasons)))$Category.SKU, Total.2023 != 0)
+pdf(paste0("../Analysis/Sales_trend_", Sys.Date(), ".pdf"), width = 9, height = 4)
+for(group in unique(sales_cat_last12month$Category.Group)){
+  cat_sales_annual <- sales_cat_last12month %>% filter(Category.Group == group) %>% select(Cat_SKU, contains("Total")) %>% 
+    pivot_longer(!Cat_SKU, names_to = "Year", values_to = "Sales") %>% mutate(Year = gsub("Total\\.", "", Year))
+  cat_sales_annual_plot <- ggplot(cat_sales_annual, aes(Year, Sales, color = Cat_SKU, group = Cat_SKU)) + geom_point() + geom_line() + 
+    labs(title = paste0(group, "\nSales for the last 4 years"), color = "") + xlab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+  cat_sales_monthly <- sales_cat_last12month %>% filter(Category.Group == group) %>% select(-contains("Total"), -Category.Group) %>% 
+    pivot_longer(!Cat_SKU, names_to = "Month", values_to = "Sales") %>% mutate(Month = factor(Month, levels = Month[1:12]))
+  cat_sales_monthly_plot <- ggplot(cat_sales_monthly, aes(Month, Sales, color = Cat_SKU, group = Cat_SKU)) + geom_point() + geom_line() + 
+    labs(title = paste0(group, "\nSales for the last 12 months"), color = "") + xlab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5)) + guides(color = "none")
+  grid.arrange(cat_sales_monthly_plot, cat_sales_annual_plot, ncol = 2)
+}
+dev.off()
 
 # ------------- FW clearance -------------
 monR_cat <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRatio2023_category_adjust_2024-01-25.csv", full.names = T), as.is = T) %>% mutate(FW_peak = Sep + Oct + Nov + Dec, Jan2Jun = Jan + Feb + Mar + Apr + May + June) %>% `row.names<-`(.[, "Category"])
@@ -397,4 +420,5 @@ woo_old <- read.csv("../woo/wc-product-export-17-6-2024-1718640775225.csv", as.i
 clearance <- read.csv("../Analysis/Retail JJ Deals set to end on 2030.csv", as.is = T) %>% 
   mutate(old.price = woo_old[SKU, "Sale.price"], qty = ifelse(SKU %in% xoro$Item., xoro[SKU, "ATS"], 0), Sale.price = ifelse(is.na(Sale.price), old.price, Sale.price), discount = ifelse(is.na(Sale.price), 0, round((Regular.price - Sale.price)/Regular.price, 2)))
 write.csv(clearance, file = "../Analysis/Retail JJ Deals set to end on 2030.csv", row.names = F, na = "")
+
 
