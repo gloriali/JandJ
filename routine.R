@@ -57,9 +57,9 @@ payments <- read.csv(list.files(path = "../Clover/", pattern = paste0("Payments-
 point <- data.frame(Email = payments$email, Points = as.integer(payments$Amount - payments$Refund.Amount)) %>% filter(Points != 0, !is.na(Email))
 # customer info: Square > Customers > Export customers
 # sales: Square > Transactions > select dates > Export Transactions CSV
-square_customer <- read.csv("../Square/customers.csv", as.is = T) %>% `row.names<-`(.[, "Square.Customer.ID"]) 
-transactions <- read.csv("../Square/transactions-2024-03-20-2024-04-11.csv", as.is = T) %>% filter(Customer.ID != "")
-point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected)))) %>% filter(Points != 0, !is.na(Email))
+#square_customer <- read.csv("../Square/customers.csv", as.is = T) %>% `row.names<-`(.[, "Square.Customer.ID"]) 
+#transactions <- read.csv("../Square/transactions-2024-03-20-2024-04-11.csv", as.is = T) %>% filter(Customer.ID != "")
+#point <- bind_rows(point, data.frame(Email = square_customer[transactions$Customer.ID, "Email.Address"], Points = as.integer(gsub("\\$", "", transactions$Total.Collected)))) %>% filter(Points != 0, !is.na(Email))
 write.csv(point, file = paste0("../yotpo/", format(Sys.Date(), "%m%d%Y"), "-yotpo.csv"), row.names = F)
 # upload to Yotpo
 non_included <- read.csv("../yotpo/non_included.csv", as.is = T)
