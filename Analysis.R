@@ -27,7 +27,7 @@ write.csv(offline, file = paste0("../Analysis/offline_", Sys.Date(), ".csv"), ro
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
 # ------------- to inactivate --------------------------
-clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% `row.names<-`(toupper(.[, "Name"]))
+clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(!is.na(Name)) %>% `row.names<-`(toupper(.[, "Name"]))
 sheets <- grep("-WK", getSheetNames(RawData), value = T)
 inventory <- data.frame()
 for(sheet in sheets){
@@ -39,7 +39,7 @@ inventory <- inventory %>% rename("Inv_Total_End.WK" = "Inv_Total_End.WK.(Not.In
 write.csv(inventory, file = paste0("../Analysis/Sales_Inventory_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
 inventory_s <- inventory %>% count(Adjust_MSKU, wt = Inv_Total_End.WK) %>% `row.names<-`(toupper(.[, "Adjust_MSKU"]))
 qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(MSKU = toupper(MSKU), Inv_clover = clover[MSKU, "Quantity"], Inv_Total_EndWK = inventory_s[MSKU, "n"]) %>% 
-  filter(!grepl(new_season, Seasons.SKU) & MSKU.Status == "Active" & Inv_clover == 0 & Inv_Total_EndWK == 0)
+  filter(!grepl("25", Seasons.SKU) & !grepl(new_season, Seasons.SKU) & MSKU.Status == "Active" & Inv_clover == 0 & Inv_Total_EndWK == 0)
 write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 
