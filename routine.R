@@ -69,7 +69,7 @@ write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.nam
 
 # -------- Request stock from Surrey: at request --------------------
 # input Clover > Inventory > Items > Export.
-request <- c("GHA", "GBX", "SPW", "HAV0", "HAD0", "UG1") # categories to restock
+request <- c("FHA", "LBT", "LBP", "LAB", "LAN", "FJM", "FPM", "FSM", "XBK", "XBM", "XLB", "XPC") # categories to restock
 n <- 3       # Qty per SKU to stock at Richmond
 n_xoro <- 10 # min Qty in stock at Surrey to request
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
