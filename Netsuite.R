@@ -5,19 +5,24 @@ library(scales)
 library(ggplot2)
 library(xlsx)
 library(data.table)
-netsuite_R <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 25:31)) %>% `row.names<-`(.[, "V1"])
-netsuite_R[netsuite_R == "" | is.na(netsuite_R)] <- 0
-netsuite_R[, 2:8] <- lapply(netsuite_R[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
-netsuite_S <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 32:38)) %>% `row.names<-`(.[, "V1"])
-netsuite_S[netsuite_S == "" | is.na(netsuite_S)] <- 0
-netsuite_S[, 2:8] <- lapply(netsuite_S[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
+# netsuite_R <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 11:17)) %>% `row.names<-`(.[, "V1"])
+# netsuite_R[netsuite_R == "" | is.na(netsuite_R)] <- 0
+# netsuite_R[, 2:8] <- lapply(netsuite_R[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
+# netsuite_S <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 18:24)) %>% `row.names<-`(.[, "V1"])
+# netsuite_S[netsuite_S == "" | is.na(netsuite_S)] <- 0
+# netsuite_S[, 2:8] <- lapply(netsuite_S[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
+# netsuite_C <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 4:10)) %>% `row.names<-`(.[, "V1"])
+# netsuite_C[netsuite_C == "" | is.na(netsuite_C)] <- 0
+# netsuite_C[, 2:8] <- lapply(netsuite_C[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
 
 # ------------- update Richmond inventory ---------------------------
-clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name != "") %>% `row.names<-`(.[, "Name"])
-inventory_update <- netsuite_R %>% filter(grepl("\\w+\\-.+", V1)) %>% 
-  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), Item = V1, Adjust.Qty.By = ifelse(V1 %in% clover_item$Name, clover_item[V1, "Quantity"], 0) - `On Hand`, Quantity = Adjust.Qty.By, BIN = "BIN", Reason.Code = "Cycle Counting", MEMO = "Inventory Update", Location = "WH-RICHMOND", External.ID = paste0("IA-", format(Sys.Date(), "%y%m%d"))) %>%
-  select(Date, Item, Adjust.Qty.By, Quantity, BIN, Reason.Code, MEMO, Location, External.ID) %>% filter(Quantity != 0)
-colnames(inventory_update) <- gsub("\\.", " ", colnames(inventory_update))
+netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% mutate(Name = toupper(Name))
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
+netsuite_item <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND") %>% `row.names<-`(.[, "Name"])
+inventory_update <- clover_item %>% mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(Name %in% netsuite_item$Name, Quantity - netsuite_item[Name, "Warehouse.On.Hand"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IA", format(Sys.Date(), "%y%m%d"))) %>%
+  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
+colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F)
 
 # ------------- upload Clover SO ---------------------------
