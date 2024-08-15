@@ -377,6 +377,23 @@ hats_sales_other <- rbind(hats_sales_old, hats_sales_limit) %>% mutate(Total.202
   select(SKU, Name, Seasons, Regular.price, Qty, time_yrs, Total.2024, Total.2024.JJ, Total.2024.AMZ)
 write.csv(hats_sales_other, file = "../Analysis/hats_sales_other_2024-05-29.csv", row.names = F)
 
+# ----------------- B2S / Grand opening --------------
+#price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = round(max(Regular.price) * 0.85, 2)) %>% as.data.frame()
+#write.csv(price, file = "../Clover/B2S_opening_price.csv", row.names = F)
+price <- read.csv("../Clover/B2S_opening_price.csv", as.is = T)
+price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20"), Price = c(5, 10, 15, 20))) %>% `row.names<-`(toupper(.[, "cat"])) 
+mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
+cat_sep <- c("WJA", "WJT", "WPF", "WPS")
+size_s <- c("1T", "2T", "3T", "4T", "5T", "6Y")
+special_price <- c("WSS-CNL", "WSS-DNL", "WSS-TRZ", "WSS-UNC")
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(Name != "") %>% mutate(cat = toupper(mastersku[Name, "Category.SKU"]), size = toupper(mastersku[Name, "Size"]), SPU = paste0(toupper(mastersku[Name, "Category.SKU"]), "-", toupper(mastersku[Name, "Print.SKU"])), cat = ifelse(cat %in% cat_sep, ifelse(size %in% size_s, paste0(cat, "_S"), paste0(cat, "_L")), cat)) %>% 
+  mutate(Price = ifelse(cat %in% rownames(price), price[cat, "Price"], ifelse(woo[Name, "Sale.price"] < woo[Name, "Regular.price"] * 0.85, woo[Name, "Sale.price"], round(woo[Name, "Regular.price"] * 0.85, 2))), Price = ifelse(SPU %in% special_price, 50, Price), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST"), Tax.Rates = ifelse(is.na(Tax.Rates), "GST", Tax.Rates)) %>% select(-cat, -size, -SPU)
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+
 # ---------- ABC show 2024 -----------
 xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% 
   mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(.[, "Item."])
