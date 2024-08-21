@@ -402,9 +402,27 @@ deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(cl
 writeData(clover, sheet = "Items", clover_item)
 openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 ## Receive stock
-order <- read.csv("../Clover/order08062024.csv", as.is = T) %>% `row.names<-`(.[, "ItemNumber"])
+order <- read.csv("../Clover/order08142024.csv", as.is = T) %>% `row.names<-`(.[, "ItemNumber"])
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- openxlsx::readWorkbook(clover, "Items") %>% mutate(Quantity = ifelse(Name %in% order$ItemNumber, Quantity + order[Name, "Qty"], Quantity))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+## Set barcode for MWPF MWPS
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(!is.na(Name)) %>% `row.names<-`(.[, "Name"]) 
+clover_item_WP <- clover_item %>% filter(grepl("^WP", Name)) 
+clover_item <- clover_item %>% mutate(Product.Code = ifelse(grepl("^MWP", Name), clover_item_WP[gsub("^MWP", "WP", Name), "Product.Code"], Product.Code))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+## deduct Square sales stock
+square_so <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "items", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
+  group_by(Item) %>% summarize(Qty = sum(Count)) %>% as.data.frame() %>% `row.names<-`(.[, "Item"]) 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% mutate(Quantity = ifelse(Name %in% square_so$Item, Quantity - square_so[Name, "Qty"], Quantity))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
 writeData(clover, sheet = "Items", clover_item)
