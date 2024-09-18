@@ -59,3 +59,10 @@ inventory_update <- xoro_CN %>% mutate(Date = format(Sys.Date(), "%m/%d/%Y"), IT
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IA-China-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 
+# ------------- Clover items not in NS ---------------------------
+mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
+netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% mutate(Name = toupper(Name))
+clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") 
+items <- clover_item %>% filter(!(Name %in% netsuite_item$Name)) %>% mutate(Seasons = mastersku[Name, "Seasons.SKU"], Status = mastersku[Name, "MSKU.Status"]) %>% 
+  select(Name, Alternate.Name, Status, Seasons, Quantity)
+write.csv(items, file = paste0("../NetSuite/items_Clover_notNS", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
