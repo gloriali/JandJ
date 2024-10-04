@@ -6,6 +6,7 @@ library(ggplot2)
 library(xlsx)
 library(data.table)
 library(tidyr)
+library(readr)
 # netsuite_R <- fread(list.files(path = "../NetSuite/", pattern = paste0("CurrentInventorySnapshot", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), data.table = F, skip = 7, select = c(1, 11:17)) %>% `row.names<-`(.[, "V1"])
 # netsuite_R[netsuite_R == "" | is.na(netsuite_R)] <- 0
 # netsuite_R[, 2:8] <- lapply(netsuite_R[, 2:8], function(x) as.numeric(gsub("\\,", "", x)))
@@ -51,7 +52,8 @@ XHS_so <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../XHS/", pa
 netsuite_so <- XHS_so %>% filter(Financial.Status == "paid") %>% mutate(Order.date = format(as.Date(gsub(" .*", "", Created.At), "%Y-%m-%d"), "%m/%d/%Y")) %>% 
   mutate(Payment.Option = "AlphaPay", Class = "FBM : CN", MEMO = "XHS sales", Customer = "56 XHS CN", Order.ID = Order.No, REF.ID = paste0("XHSCN-", Order.No), Order.Type = "XHS CN", Department = "Retail : Marketplace : XiaoHongShu", Warehouse = "WH-RICHMOND", Item.SKU = LineItem.SKU, Quantity = as.numeric(LineItem.Quantity), Price.level = "Custom", Rate = round((as.numeric(LineItem.Total) - as.numeric(LineItem.Total.Discount))/Quantity, 2), Coupon.Discount = as.numeric(LineItem.Total.Discount), Coupon.Discount = ifelse(Coupon.Discount == 0, "", Coupon.Discount), Coupon.Code = "", Tax.Amount = "", Tax.Code = "", Recipient = paste0(Shipping.Last.Name, Shipping.First.Name), Recipient.Phone = Phone, Recipient.Email = Email, SHIPPING.CARRIER = "Longxing", SHIPPING.METHOD = "", SHIPPING.COST = Shipping) %>% 
   select(Payment.Option, Class, Order.date, REF.ID, Order.Type, Department, Warehouse, MEMO, Order.ID, Item.SKU, Quantity, Price.level, Rate, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount, Customer, Recipient, Recipient.Phone, Recipient.Email, SHIPPING.CARRIER, SHIPPING.METHOD, SHIPPING.COST)
-write.csv(netsuite_so, file = paste0("../XHS/SO-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, fileEncoding = "UTF-8", na = "")
+Encoding(netsuite_so$Recipient) = "UTF-8"
+write_excel_csv(netsuite_so, file = paste0("../XHS/SO-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
 # ------------- upload CN inventory ---------------------------
 xoro_CN <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("CN_Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(ATS > 0) %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
@@ -124,3 +126,59 @@ CAT <- paste((PO %>% distinct(cat))$cat, collapse = " ")
 PO_NS <- PO %>% mutate(PO.TYPE = "Daycare Uniforms", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-SURREY", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("CEFA order for ", season), ITEM = SKU.Number,  QUANTITY = Quantity, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
   filter(Quantity > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.names = F, na = "")
+
+# ------------ upload regular POs -------------------
+season <- "24F"
+PO_NS <- data.frame()
+for(p in 364:366){
+  ID <- paste0("P", p)
+  file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
+  memo <- gsub("\\.xlsx", "",gsub(paste0(".*", ID, " *\\- *"), "", file))
+  print(paste(ID, memo))
+  PO <- openxlsx::read.xlsx(file, sheet = 1, startRow = 8) 
+  if(sum(grepl("加拿大总数量", colnames(PO)))){
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("加拿大总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_CA <- PO %>% select("产品编号", "加拿大总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_CA %>% distinct(cat))$cat, collapse = " ")
+    PO_CA_NS <- PO_CA %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-SURREY", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(加拿大总数量), 0, 加拿大总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    Encoding(PO_CA_NS$MEMO) = "UTF-8"
+    print(paste("CA", sum(PO_CA_NS$QUANTITY), PO[2, "加拿大总数量"]))
+    PO_NS <- rbind(PO_NS, PO_CA_NS)
+    write_excel_csv(PO_CA_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_CA_", ID, ".csv"), na = "")
+  }
+  if(sum(grepl("英国总数量", colnames(PO)))){
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("英国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_UK <- PO %>% select("产品编号", "英国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_UK %>% distinct(cat))$cat, collapse = " ")
+    PO_UK_NS <- PO_UK %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-AMZ : FBA-UK", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(英国总数量), 0, 英国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    Encoding(PO_UK_NS$MEMO) = "UTF-8"
+    print(paste("UK", sum(PO_UK_NS$QUANTITY), PO[2, "英国总数量"]))
+    PO_NS <- rbind(PO_NS, PO_UK_NS)
+    write_excel_csv(PO_UK_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_UK_", ID, ".csv"), na = "")
+  }
+  if(sum(grepl("德国总数量", colnames(PO)))){
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("德国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_DE <- PO %>% select("产品编号", "德国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_DE %>% distinct(cat))$cat, collapse = " ")
+    PO_DE_NS <- PO_DE %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-AMZ : FBA-DE", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(德国总数量), 0, 德国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    Encoding(PO_DE_NS$MEMO) = "UTF-8"
+    print(paste("DE", sum(PO_DE_NS$QUANTITY), PO[2, "德国总数量"]))
+    PO_NS <- rbind(PO_NS, PO_DE_NS)
+    write_excel_csv(PO_DE_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_DE_", ID, ".csv"), na = "")
+  }
+  if(sum(grepl("中国总数量", colnames(PO)))){
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_CN <- PO %>% select("产品编号", "中国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_CN %>% distinct(cat))$cat, collapse = " ")
+    PO_CN_NS <- PO_CN %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-CHINA", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(中国总数量), 0, 中国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    Encoding(PO_CN_NS$MEMO) = "UTF-8"
+    print(paste("CN", sum(PO_CN_NS$QUANTITY), PO[2, "中国总数量"]))
+    PO_NS <- rbind(PO_NS, PO_CN_NS)
+    write_excel_csv(PO_CN_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_CN_", ID, ".csv"), na = "")
+  }
+}
+write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
