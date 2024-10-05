@@ -8,9 +8,6 @@ library(ggplot2)
 library(tidyr)
 library(readr)
 
-# input: woo > Products > All Products > Export > all
-woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
-  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(toupper(.[, "SKU"])) 
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
 
 # ------------- upload Square SO to NS: daily ---------------------------
@@ -46,6 +43,9 @@ write_excel_csv(netsuite_so, file = paste0("../XHS/SO-XHS-", format(Sys.Date(), 
 
 # ====================================================================
 
+# input: woo > Products > All Products > Export > all
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(toupper(.[, "SKU"])) 
 # input: NS > Items > Export all warehouses
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
