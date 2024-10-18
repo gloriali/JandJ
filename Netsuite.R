@@ -205,3 +205,28 @@ for(p in 370:403){
 print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_NS$QUANTITY), total))
 write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_regular_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
+# ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits -------------------
+ID <- "P406"; season <- "25S"; type <- "CA-Clement"; warehouse <- "WH-SURREY"
+file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
+PO_NS <- data.frame(); total <- 0; items <- 0; CAT <- c()
+for(f in file){
+  sheets <- getSheetNames(f)[getSheetNames(f) != "Export Summary"]
+  memo <- gsub(paste0(".*", ID, " *\\- *"), "", gsub(paste0("\\/", ID, "-.*\\.xlsx"), "", f))
+  for(s in sheets){
+    print(c(memo, s))
+    PO <- openxlsx::read.xlsx(f, sheet = s, startRow = 8)
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_WS <- PO %>% select("产品编号", "订单.总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- c(CAT, paste((PO_WS %>% distinct(cat))$cat, collapse = " "))
+    PO_WS_NS <- PO_WS %>% mutate(PO.TYPE = type, CATEGORY = "", SEASON = season, REF.NO = ID, WAREHOUSE = warehouse, VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(订单.总数量), 0, 订单.总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    total <- total + sum(PO_WS_NS$QUANTITY)
+    items <- items + nrow(PO_WS_NS)
+    print(paste0("No. of items: ", nrow(PO_WS_NS), "; Qty: ", sum(PO_WS_NS$QUANTITY)))
+    PO_NS <- rbind(PO_NS, PO_WS_NS)
+  }
+}
+PO_NS$CATEGORY <- paste(CAT, collapse = " ")
+print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_NS$QUANTITY), total))
+write_excel_csv(PO_NS, file = paste0(gsub("(.*\\/).*", "\\1", f), "NS_PO_", ID, ".csv"), na = "")
+
