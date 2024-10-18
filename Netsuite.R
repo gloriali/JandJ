@@ -160,7 +160,7 @@ for(p in 370:403){
     ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("英国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_UK <- PO %>% select("产品编号", "英国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_UK %>% distinct(cat))$cat, collapse = " ")
-    PO_UK_NS <- PO_UK %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-AMZ : FBA-UK", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(英国总数量), 0, 英国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+    PO_UK_NS <- PO_UK %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = paste0(ID, "-UK"), WAREHOUSE = "WH-AMZ : FBA-UK", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(英国总数量), 0, 英国总数量)), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-UK")) %>% 
       filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
     print(paste("UK", sum(PO_UK_NS$QUANTITY), PO[2, "英国总数量"]))
     total <- total + as.numeric(PO[2, "英国总数量"])
@@ -175,7 +175,7 @@ for(p in 370:403){
     ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("德国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_DE <- PO %>% select("产品编号", "德国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_DE %>% distinct(cat))$cat, collapse = " ")
-    PO_DE_NS <- PO_DE %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-AMZ : FBA-DE", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(德国总数量), 0, 德国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+    PO_DE_NS <- PO_DE %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = paste0(ID, "-DE"), WAREHOUSE = "WH-AMZ : FBA-DE", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(德国总数量), 0, 德国总数量)), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-DE")) %>% 
       filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
     print(paste("DE", sum(PO_DE_NS$QUANTITY), PO[2, "德国总数量"]))
     total <- total + as.numeric(PO[2, "德国总数量"])
@@ -190,7 +190,7 @@ for(p in 370:403){
     ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_CN <- PO %>% select("产品编号", "中国总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_CN %>% distinct(cat))$cat, collapse = " ")
-    PO_CN_NS <- PO_CN %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-CHINA", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(中国总数量), 0, 中国总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+    PO_CN_NS <- PO_CN %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = paste0(ID, "-CN"), WAREHOUSE = "WH-CHINA", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(中国总数量), 0, 中国总数量)), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-CN")) %>% 
       filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
     print(paste("CN", sum(PO_CN_NS$QUANTITY), PO[2, "中国总数量"]))
     total <- total + as.numeric(PO[2, "中国总数量"])
