@@ -206,7 +206,7 @@ if(month %in% c("01", "02")){
 write.csv(monR, file = paste0("../Analysis/MonthlyRatio_", Sys.Date(), ".csv"), row.names = F)
 ## SKUs to move offline
 offline <- netsuite_item_S %>% filter(!grepl(new_season, Seasons) & Warehouse.Available <= qty_offline & Warehouse.Available > 0) %>% arrange(Name) %>% 
-  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = "24F", FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Richmond Refill", ORDER.PLACED.BY = "Gloria Li", ITEM = Name, Quantity = Warehouse.Available) %>% select(Date:Quantity)
+  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = "24F", FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Qty <= 3 items to transfer to Richmond ", ORDER.PLACED.BY = "Gloria Li", ITEM = Name, Quantity = Warehouse.Available) %>% select(Date:Quantity)
 offline <- offline %>% rename_with(~ gsub("\\.", " ", colnames(offline)))
 write.csv(offline, file = paste0("../Analysis/offline_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
