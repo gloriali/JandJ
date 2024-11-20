@@ -9,29 +9,28 @@ library(tidyr)
 ## Little Red Book Listing
 woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(toupper(.[, "SKU"])) 
-xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - JJ") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
+netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(toupper(.[, "Name"])) 
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
 openxlsx::protectWorkbook(wb, protect = F)
 openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 
-### -------- update inventory with xoro, price with woo, product description ----------------
-products_upload <- products_XHS %>% mutate(Inventory = ifelse(xoro[SKU, "ATS"] < 10, 0, xoro[SKU, "ATS"]), Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
-products_upload <- products_upload %>% mutate(Product.Name = products_description[toupper(SPU), "Product.Name"], SEO.Product.Name = Product.Name, Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
-colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
-openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
-# upload to AllValue > Products
-
-### -------- update inventory with xoro China ----------------
-xoro <- read.xlsx2(list.files(path = "../xoro/", pattern = paste0("CN_Item Inventory Snapshot_", format(Sys.Date(), "%m%d%Y"), ".xlsx"), full.names = T), sheetIndex = 1) %>% filter(Store == "Warehouse - China") %>% mutate(Item. = toupper(Item.), ATS = as.numeric(ATS)) %>% `row.names<-`(toupper(.[, "Item."])) 
+### -------------- Sync XHS price to woo; inventory to NS S ---------------
+# input: AllValue > Products > Export > All products
+products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
 openxlsx::protectWorkbook(wb, protect = F)
 openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
-products_upload <- products_XHS %>% mutate(Inventory = xoro[SKU, "ATS"])
+products_XHS[products_XHS=="NA"] <- ""
+products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 10, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
+products_upload <- products_upload %>% mutate(Product.Name = products_description[toupper(SPU), "Product.Name"], SEO.Product.Name = Product.Name, Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
-openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"))
+openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), na.string = "")
+# upload to AllValue > Products
 
 ### -------- extract and update existing descriptions -----------------
 products_description <- products_XHS %>% filter(!duplicated(SPU)) %>% mutate(SPU = toupper(SPU), cat = gsub("-.*", "", SKU), Description = paste(Description, SEO.Description, Describe), Description = str_trim(gsub("NA", "", Description))) %>% select(SPU, Product.Name, cat, Description, Categories, Option1.Name, Image.Src)
@@ -75,8 +74,8 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) 
 rownames(products_description) <- products_description$SPU
 new_listing <- data.frame(SKU = woo$SKU) %>% 
-  mutate(status = mastersku[SKU, "MSKU.Status"], seasons = mastersku[SKU, "Seasons"], SPU = mastersku[SKU, "SPU"], cat = mastersku[SKU, "Category.SKU"], s = paste(cat, gsub("[tyTY]", "", mastersku[SKU, "Size"]), sep = "_"), Product.Name = products_description[SPU, "Product.Name"], Description = products_description[SPU, "Description"], Mobile.Description = Description, Vendor = "Jan & Jul", Categories = products_description[SPU, "Categories"], Option1.Name = products_description[SPU, "Option1.Name"], Option1.Value = mastersku[SKU, "Size"], Option2.Name = "", Option2.Value = "", Option3.Name = "", Option3.Value = "", Weight = woo[SKU, "Weight..g."], Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[SKU, "UPC.Active"], Image.Src = products_description[SPU, "Image.Src"], Image.Position = "", SEO.Product.Name = Product.Name, SEO.Description = Description, Variant.Image = "", Weight.Unit = "g", Cost.Price = "", Describe = "", Inventory = ifelse(xoro[SKU, "ATS"] < 20, 0, xoro[SKU, "ATS"])) %>%
-  filter(status == "Active", SKU %in% xoro$Item., Inventory > 0, !(SPU %in% toupper(products_XHS$SPU)), cat %in% products_description_cat$cat, SPU %in% products_description$SPU)  %>% 
+  mutate(status = mastersku[SKU, "MSKU.Status"], seasons = mastersku[SKU, "Seasons"], SPU = mastersku[SKU, "SPU"], cat = mastersku[SKU, "Category.SKU"], s = paste(cat, gsub("[tyTY]", "", mastersku[SKU, "Size"]), sep = "_"), Product.Name = products_description[SPU, "Product.Name"], Description = products_description[SPU, "Description"], Mobile.Description = Description, Vendor = "Jan & Jul", Categories = products_description[SPU, "Categories"], Option1.Name = products_description[SPU, "Option1.Name"], Option1.Value = mastersku[SKU, "Size"], Option2.Name = "", Option2.Value = "", Option3.Name = "", Option3.Value = "", Weight = woo[SKU, "Weight..g."], Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[SKU, "UPC.Active"], Image.Src = products_description[SPU, "Image.Src"], Image.Position = "", SEO.Product.Name = Product.Name, SEO.Description = Description, Variant.Image = "", Weight.Unit = "g", Cost.Price = "", Describe = "", Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 20, 0, netsuite_item_S[SKU, "Warehouse.Available"])) %>%
+  filter(status == "Active", SKU %in% netsuite_item_S$Name, Inventory > 0, !(SPU %in% toupper(products_XHS$SPU)), cat %in% products_description_cat$cat, SPU %in% products_description$SPU)  %>% 
   select(SPU, Product.Name, Description, Mobile.Description, Vendor, Categories, Tags, Option1.Name, Option1.Value, Option2.Name, Option2.Value, Option3.Name, Option3.Value, SKU, Weight, Price, Compare.At.Price, Requires.Shipping, Taxable, Barcode, Image.Src, Image.Position, SEO.Product.Name, SEO.Description, Variant.Image, Weight.Unit, Cost.Price, Inventory, Describe)
 colnames(new_listing) <- gsub("\\.", " ", colnames(new_listing))
 openxlsx::write.xlsx(new_listing, file = paste0("../XHS/new_listing-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), sheetName = "Sample")
