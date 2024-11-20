@@ -51,7 +51,6 @@ netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("It
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(toupper(.[, "Name"])) 
 netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND") %>% `row.names<-`(toupper(.[, "Name"])) 
-write.csv(netsuite_item_S, file = paste0("../FBArefill/Raw Data File/Items_S_", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 
 # -------- Sync XHS price to woo; inventory to NS S: weekly ----------------
 # input: AllValue > Products > Export > All products
