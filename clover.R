@@ -140,3 +140,23 @@ vbaby$Quantity <- vbaby$Quantity + richmond[vbaby$Name, "Current.Quantity.Jan...
 vbaby[vbaby$Quantity < 0, "Quantity"] <- 0
 vbaby[grep("NA", vbaby$Product.Code), "Product.Code"] <- ""
 write.csv(vbaby, file = "../clover_item/inventory20231030-items-upload.csv", row.names = F, na = "")
+
+# -------- Black Friday sales 2024 -------- 
+library(dplyr)
+library(stringr)
+library(openxlsx)
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(toupper(.[, "SKU"])) 
+price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = round(max(Regular.price) * 0.8, 2)) %>% as.data.frame()
+price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK"), Price = c(5, 10, 15, 20, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30))) %>% `row.names<-`(toupper(.[, "cat"])) 
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(Name != "") %>% 
+  mutate(cat = toupper(gsub("-.*", "", Name)), Price = ifelse(toupper(Name) %in% toupper(woo$SKU), ifelse(woo[Name, "Sale.price"] < round(woo[Name, "Regular.price"] * 0.8, 2), woo[Name, "Sale.price"], round(woo[Name, "Regular.price"] * 0.8, 2)), price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST"), Tax.Rates = ifelse(is.na(Tax.Rates), "GST", Tax.Rates)) %>% select(-cat)
+clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^SS", Name), 10, Price))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+square <- data.frame(Token = "", ItemName = woo$SKU, ItemType = "", VariationName = "Regular", SKU = woo$SKU, Description = "", Category = netsuite_item_S[woo$SKU, "Item.Category.SKU"], Price = ifelse(woo$Sale.price < round(woo$Regular.price*0.8, 2), woo$Sale.price, round(woo$Regular.price*0.8, 2)), PriceRichmond = "", PriceSurrey = "", NewQuantityRichmond = netsuite_item_S[woo$SKU, "Warehouse.Available"], NewQuantitySurrey = netsuite_item_S[woo$SKU, "Warehouse.Available"], EnabledRichmond = "Y", CurrentQuantityRichmond = "", CurrentQuantitySurrey = "", StockAlertEnabledRichmond = "N", StockAlertCountRichmond = 0, EnabledSurrey = "Y", StockAlertEnabledSurrey = "N", StockAlertCountSurrey = 0, SEOTitle = "",	SEODescription = "",	Permalink = "", SquareOnlineItemVisibility = "UNAVAILABLE",	ShippingEnabled = "",	SelfserveOrderingEnabled = "",	DeliveryEnabled = "",	PickupEnabled = "", Sellable = "Y",	Stockable = "Y",	SkipDetailScreeninPOS = "",	OptionName1 = "",	OptionValue1 = "", TaxPST = ifelse(woo$Tax.class == "full", "Y", "N")) %>%
+  mutate(NewQuantityRichmond = ifelse(is.na(NewQuantityRichmond), 0, NewQuantityRichmond), NewQuantitySurrey = ifelse(is.na(NewQuantitySurrey), 0, NewQuantitySurrey))
+write.table(square, file = paste0("../Square/square-upload-", Sys.Date(), ".csv"), sep = ",", row.names = F, col.names = c(colnames(square)[1:ncol(square)-1], "Tax - PST (7%)"), na = "")
