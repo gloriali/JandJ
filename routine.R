@@ -12,7 +12,7 @@ netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", p
 
 # ------------- upload Square SO to NS: daily ---------------------------
 customer <- read.csv("../Square/customers.csv", as.is = T) %>% `row.names<-`(.[, "Square.Customer.ID"])
-payments <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "transactions-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "Payment.ID"])
+payments <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "transactions-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Event.Type != "Refund") %>% `row.names<-`(.[, "Payment.ID"])
 square_so <- read.csv(rownames(file.info(list.files(path = "../Square/", pattern = "items-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
   mutate(Item = ifelse(Item %in% netsuite_item$Name, Item, "MISC-ITEM"), Cash = payments[Payment.ID, "Cash"], Recipient.Email = ifelse(is.na(Customer.ID), "", customer[Customer.ID, "Email.Address"]), Recipient.Phone = ifelse(is.na(Customer.ID), "", customer[Customer.ID, "Phone.Number"]))
 netsuite_so <- square_so %>% filter(Item != "") %>% mutate(Order.date = format(as.Date(Date, "%Y-%m-%d"), "%m/%d/%Y")) %>% group_by(Order.date) %>% 
@@ -60,7 +60,7 @@ openxlsx::protectWorkbook(wb, protect = F)
 openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 products_XHS[products_XHS=="NA"] <- ""
-products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 10, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = woo[SKU, "Sale.price"], Compare.At.Price = woo[SKU, "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
+products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 10, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = ifelse(grepl("^L", SKU), woo[SKU, "Sale.price"] + 10, woo[SKU, "Sale.price"]), Compare.At.Price = ifelse(grepl("^L", SKU), woo[SKU, "Regular.price"] + 10, woo[SKU, "Regular.price"]), Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
 products_upload <- products_upload %>% mutate(Product.Name = products_description[toupper(SPU), "Product.Name"], SEO.Product.Name = Product.Name, Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), na.string = "")
