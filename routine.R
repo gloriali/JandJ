@@ -339,7 +339,7 @@ openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.D
 # ------------ upload regular POs -------------------
 season <- "25S"
 PO_NS <- data.frame(); total <- 0; items <- 0
-for(p in 370:403){
+for(p in 470:477){
   ID <- paste0("P", p)
   file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
   if(length(file) != 1){print(paste(ID, "INPUT FILE ERROR:", length(file), "files found")); next}
@@ -347,7 +347,7 @@ for(p in 370:403){
   print(paste(ID, memo))
   PO <- openxlsx::read.xlsx(file, sheet = 1, startRow = 8) 
   if(sum(grepl("加拿大总数量", colnames(PO))) == 1){
-    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("加拿大总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("加拿大总数量", colnames(PO)))+3]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_CA <- PO %>% select("产品编号", "加拿大总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_CA %>% distinct(cat))$cat, collapse = " ")
     PO_CA_NS <- PO_CA %>% mutate(PO.TYPE = "Regular", CATEGORY = CAT, SEASON = season, REF.NO = paste0(ID, "-CA"), WAREHOUSE = "WH-SURREY", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(加拿大总数量), 0, 加拿大总数量)), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-CA")) %>% 
