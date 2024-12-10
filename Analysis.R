@@ -470,4 +470,34 @@ clearance <- read.csv("../Analysis/Retail JJ Deals set to end on 2030.csv", as.i
   mutate(old.price = woo_old[SKU, "Sale.price"], qty = ifelse(SKU %in% xoro$Item., xoro[SKU, "ATS"], 0), Sale.price = ifelse(is.na(Sale.price), old.price, Sale.price), discount = ifelse(is.na(Sale.price), 0, round((Regular.price - Sale.price)/Regular.price, 2)))
 write.csv(clearance, file = "../Analysis/Retail JJ Deals set to end on 2030.csv", row.names = F, na = "")
 
+# ----------- Boxing Day sale 2024 -------------
+# IHT arrived late and will use last year's (Dec, Jan, Feb) sales for prediction
+categories <- c("KEH", "KMT", "IHT", "ISS", "IPS", "ISB", "ISJ", "ICP", "IPC", "WMT", "WGS", "BST", "XBM", "XBK", "XLB", "XPC", "SWS", "SKX", "SKG", "UG1", "UJ1", "UV2", "UT1", "USA", "HXU", "HXP", "HXC", "HAD0", "HAV0", "HBS", "HCA0", "HCB0", "HCF0", "HJP", "HJS")
+netsuite_item_S <- read.csv(list.files(path = "../FBArefill/Raw Data File/", pattern = "Items_S_.*", full.names = T), as.is = T) %>%
+  mutate(Name = toupper(Name), Seasons = ifelse(Name %in% mastersku$MSKU, mastersku[Name, "Seasons.SKU"], mastersku_adjust[Name, "Seasons.SKU"]), SPU = gsub("(\\w+-\\w+)-.*", "\\1", Name)) %>% `row.names<-`(.[, "Name"])
+inventory <- read.csv(rownames(file.info(list.files(path = "../Analysis/", pattern = "Sales_Inventory_SKU_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
+sales_SKU_last12month <- read.csv(rownames(file.info(list.files(path = "../Analysis/", pattern = "Sales_SKU_last12month_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
+monR <- read.csv(rownames(file.info(list.files(path = "../Analysis/", pattern = "MonthlyRatio_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "Category"])
+if(month == "01"){last3m <- c("Month11", "Month12", "Month01")}else if(month %in% c("02", "03")){last3m <- sprintf("Month%02d", c(1:(as.numeric(month)-1), (as.numeric(month)-3+12):12))}else{last3m <- sprintf("Month%02d", c((as.numeric(month)-3):(as.numeric(month)-1)))}
+monR <- monR %>% mutate(T.last3m = ifelse(Category == "IHT", rowSums(across(all_of(c("Month12", "Month01", "Month02")))), rowSums(across(all_of(last3m))))) %>% `row.names<-`(.[, "Category"])
+inventory_SPU <- inventory %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU)) %>% group_by(SPU) %>% summarise(qty_SPU = sum(Inv_Total_End.WK, na.rm = T), qty_WH = sum(Inv_WH.JJ, na.rm = T), qty_AMZ = qty_SPU - qty_WH) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+netsuite_item_S_SPU <- netsuite_item_S %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Name)) %>% group_by(SPU) %>% summarise(qty_WH = sum(Warehouse.Available, na.rm = T)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+sales_SKU_last12month <- sales_SKU_last12month %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU), T.last3m = ifelse(grepl("IHT", SPU), rowSums(across(all_of(c("Month12", "Month01", "Month02")))), rowSums(across(all_of(last3m)))), T.yr = rowSums(across(Month01:Month12)))
+sales_SPU_last3month <- sales_SKU_last12month %>% group_by(SPU) %>% summarise(T.last3m = sum(T.last3m)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+sales_SPU_last3month_JJ <- sales_SKU_last12month %>% filter(Sales.Channel == "janandjul.com") %>% group_by(SPU) %>% summarise(T.last3m = sum(T.last3m)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+sales_SPU_last12month_AMZ <- sales_SKU_last12month %>% filter(grepl("Amazon", Sales.Channel)) %>% group_by(SPU) %>% summarise(T.last12m = sum(T.yr)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+sizes_all <- netsuite_item_S %>% mutate(SPU_size = gsub("(\\w+-\\w+-\\w+).*", "\\1", Name)) %>% filter(!duplicated(SPU_size)) %>% count(SPU) %>% `row.names<-`(.[, "SPU"])
+size_limited <- netsuite_item_S %>% filter(Warehouse.Available > qty_offline) %>% count(SPU) %>% mutate(all = sizes_all[SPU, "n"], percent = ifelse(all < n, 0, (all - n)/all)) %>% `row.names<-`(.[, "SPU"])
+woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% filter(Published == 1, !is.na(Regular.price)) %>% filter(!duplicated(SKU), SKU != "") %>% 
+  mutate(SKU = toupper(SKU), Qty = netsuite_item_S[SKU, "Warehouse.Available"], Qty = ifelse(is.na(Qty), 0, Qty), Seasons = ifelse(SKU %in% mastersku$MSKU, mastersku[SKU, "Seasons.SKU"], mastersku_adjust[SKU, "Seasons.SKU"]), discount = ifelse(is.na(Sale.price), 0, (Regular.price - Sale.price)/Regular.price), cat = mastersku[SKU, "Category.SKU"], SPU = gsub("(\\w+-\\w+)-.*", "\\1", SKU)) %>% 
+  select(ID, SKU, Name, Seasons, cat, SPU, Regular.price, discount, Qty) %>% `row.names<-`(.[, "SKU"])
+boxing_day <- woo %>% filter(Qty > qty_offline, Regular.price > 0, cat %in% categories) %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = netsuite_item_S_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
+  filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), 2), time_yrs = ifelse(is.na(time_yrs), 0, time_yrs), size_percent_missing = gsub("Sizes.missing.0%", "Sizes.missing.<.50%", paste0("Sizes.missing.", as.character(as.integer(ifelse(size_limited[SPU, "percent"] < 0.5, 0, size_limited[SPU, "percent"])*10)*10), "%"))) %>% 
+  select(SKU:Qty, time_yrs, size_percent_missing) %>% mutate(Suggest_discount = 0, Suggest_discount = ifelse(grepl("25F", Seasons), ifelse(time_yrs > 4, 0.2, 0.1), Suggest_discount), Suggest_discount = ifelse(cat == "IHT", 0.2, Suggest_discount)) %>% arrange(Suggest_discount, -time_yrs)
+boxing_day[1:54, "Suggest_discount"] <- 0.4
+boxing_day[55:101, "Suggest_discount"] <- 0.3
+boxing_day[102:250, "Suggest_discount"] <- 0.2
+boxing_day[251:500, "Suggest_discount"] <- 0.1
+boxing_day <- boxing_day %>% mutate(Suggest_discount = ifelse(cat == "HXC", Suggest_discount + 0.1, Suggest_discount), Suggest_discount = ifelse(Suggest_discount > discount, Suggest_discount, discount), Sale_price = round(Regular.price * (1 - Suggest_discount), 2)) %>% arrange(cat, -time_yrs)
+write.csv(boxing_day, file = paste0("../Analysis/Boxing_day_deals1_", Sys.Date(), ".csv"), row.names = F)
 
