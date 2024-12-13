@@ -436,10 +436,13 @@ print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_
 write_excel_csv(PO_NS, file = paste0(gsub("(.*\\/).*", "\\1", f), "NS_PO_", ID, ".csv"), na = "")
 
 # ------------ upload CEFA POs -------------------
-ID <- "CEFA5"; season <- "24F"; ReceiveDate <- "11/20/2024"
-PO <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../PO/order/CEFA/", pattern = "Order form.*.xlsx", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1, startRow = 3) %>% 
-  filter(grepl("-.*-", SKU.Number)) %>% mutate(Quantity = ifelse(is.na(Quantity), 0, Quantity), cat = gsub("-.*", "", SKU.Number))
+ID <- "CEFA6"; season <- "25S"; ReceiveDate <- "4/20/2025"
+netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
+PO <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../PO/order/CEFA/", pattern = "Order.*.xlsx", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1, startRow = 2) %>% 
+  filter(grepl("-.*-", SKU.Number), !is.na(Quantity), Quantity > 0) %>% mutate(cat = gsub("-.*", "", SKU.Number))
 CAT <- paste((PO %>% distinct(cat))$cat, collapse = " ")
+new_SKU <- PO %>% filter(!(SKU.Number %in% netsuite_item$Name)) %>% select(SKU.Number, Quantity)
+if(nrow(new_SKU)){write.csv(new_SKU, file = paste0("../PO/order/CEFA/", "new_SKU_", ID, ".csv"), row.names = F, quote = F, na = "")}
 PO_NS <- PO %>% mutate(PO.TYPE = "Daycare Uniforms", CATEGORY = CAT, SEASON = season, REF.NO = ID, WAREHOUSE = "WH-SURREY", VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("CEFA order for ", season), ITEM = SKU.Number,  QUANTITY = Quantity, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
   filter(Quantity > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.names = F, quote = F, na = "")
