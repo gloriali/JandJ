@@ -144,9 +144,9 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(toupper(.[, "ITEM"])) 
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "TO_Surrey", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(toupper(.[, "ITEM"])) 
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = toupper(SKU), Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = toupper(SKU), Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity - adjust_inventory[SKU, "Quantity"], Quantity))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
 writeData(clover, sheet = "Items", clover_item)
@@ -449,13 +449,13 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "25S"; warehouse <- "FBA-US"; PO_suffix <- "-CA"
-RefNo <- "25SSUS2"; ShippingDate <- "12/12/2024"; ReceiveDate <- "1/20/2025"
+season <- "25S"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
+RefNo <- "25SSCA2"; ShippingDate <- "12/17/2024"; ReceiveDate <- "1/20/2025"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments - Quantity.Fulfilled.Received, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
-memo <- gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/", "", shipment_in)))
+memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/", "", shipment_in))))
 sheets <- getSheetNames(shipment_in)[]
 summary <- openxlsx::read.xlsx(shipment_in, sheet = 1, fillMergedCells = T)
 shipment <- data.frame(); attachment <- data.frame(); Nbox <- 0
@@ -465,7 +465,7 @@ for(s in 2:length(sheets)){
     select(1:Season) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down")
   if(sum(grepl("CTN.NO", colnames(shipment_i))) == 1){
     print(paste(1, sheet))
-    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$`PO.#`, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = shipment_i$QTY.SHIPPED, LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
+    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$`PO.#`, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = as.numeric(shipment_i$QTY.SHIPPED), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
   }else{
     print(paste(2, sheet))
     colnames(shipment_i) <- c("Start", "End", colnames(shipment_i)[3:length(colnames(shipment_i))])
@@ -473,7 +473,7 @@ for(s in 2:length(sheets)){
     shipment_o <- data.frame()
     for(i in 1:nrow(shipment_i)){
       for(n in shipment_i[i, "Start"]:shipment_i[i, "End"]){
-        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO.#"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = shipment_i[i, "QTY.Per.Box"], LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"])))
+        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO.#"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = as.numeric(shipment_i[i, "QTY.Per.Box"]), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"])))
       }
     }
   }
@@ -482,12 +482,14 @@ for(s in 2:length(sheets)){
   shipment <- rbind(shipment, shipment_o)
   attachment <- rbind(attachment, data.frame(Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), Notes = ""))
 }
-if(sum(shipment$QUANTITY) == summary[nrow(summary), "数量"]){print(paste0("Total QTY matches: ", sum(shipment$QUANTITY)))}else{print(paste("Total QTY NOT matching:", sum(shipment$QUANTITY), summary[nrow(summary), "QTY"]))}
-if(Nbox == summary[nrow(summary), "箱数"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
+if(sum(shipment$QUANTITY) == summary[nrow(summary), "QTY"]){print(paste0("Total QTY matches: ", sum(shipment$QUANTITY)))}else{print(paste("Total QTY NOT matching:", sum(shipment$QUANTITY), summary[nrow(summary), "QTY"]))}
+if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
 # check for over-receiving
+shipment <- shipment %>% mutate(PO.REF.NO = ifelse(PO == "PO#NA", gsub("-.*", "", PO.REF.NO), PO.REF.NO), PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
 shipment <- shipment %>% group_by(PO.REF.NO, ITEM) %>% mutate(QUANTITY = sum(QUANTITY), BOX.NO = paste0(BOX.NO, collapse = " | ")) %>% distinct(PO.REF.NO, ITEM, .keep_all = T) %>% ungroup()
 OverReceive <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), Qty = QUANTITY - Qty.Remain) %>% filter(QUANTITY > Qty.Remain)
 if(nrow(OverReceive)){
+  View(OverReceive)
   PO_OverReceive <- OverReceive %>% mutate(PO.TYPE = "Over Received", CATEGORY = "MIX", SEASON = season, REF.NO = paste0("Over.", RefNo), WAREHOUSE = warehouse, VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("Over receiving in shipment ", RefNo), ITEM. = ITEM, QUANTITY. = Qty, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
     select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
   write.csv(PO_OverReceive, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_PO_", RefNo, "_OverReceive.csv"), row.names = F, na = "")
@@ -497,15 +499,16 @@ if(nrow(OverReceive)){
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000095" # over-receiving PO 
+  p <- "PO#PO000110" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
-  shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = "Over.24FWCA14", BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% arrange(ITEM)
+  shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = "Over.24FWCA14", BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
+    mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
 }
 write.csv(shipment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, ".csv"), row.names = F, quote = F, na = "")
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
 ## generate receiving csv file
-id <- "INBSHIP7"
+id <- "INBSHIP9"
 receiving <- shipment %>% mutate(ID = id, PO = gsub("PO#PO", "PO-", PO), Item = ITEM, Qty = QUANTITY) %>% select(ID, PO, Item, Qty)
 write.csv(receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving.csv"), row.names = F, quote = F, na = "")
 
