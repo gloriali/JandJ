@@ -450,12 +450,12 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
 season <- "25S"; warehouse <- "FBA-UK"; PO_suffix <- "-UK"
-RefNo <- "25SSUK1"; ShippingDate <- "12/23/2024"; ReceiveDate <- "1/30/2025"
+RefNo <- "25SSUK2"; ShippingDate <- "1/3/2024"; ReceiveDate <- "2/10/2025"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments - Quantity.Fulfilled.Received, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
-memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/", "", shipment_in))))
+memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- getSheetNames(shipment_in)[]
 summary <- openxlsx::read.xlsx(shipment_in, sheet = 1, fillMergedCells = T)
 shipment <- data.frame(); attachment <- data.frame(); Nbox <- 0
@@ -508,7 +508,7 @@ write.csv(shipment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", 
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
 ## generate receiving csv file
-id <- "INBSHIP13"
+id <- "INBSHIP14"
 receiving <- shipment %>% mutate(ID = id, PO = gsub("PO#PO", "PO-", PO), Item = ITEM, Qty = QUANTITY) %>% select(ID, PO, Item, Qty)
 write.csv(receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving.csv"), row.names = F, quote = F, na = "")
 
