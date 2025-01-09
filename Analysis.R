@@ -501,3 +501,46 @@ boxing_day[251:500, "Suggest_discount"] <- 0.1
 boxing_day <- boxing_day %>% mutate(Suggest_discount = ifelse(cat == "HXC", Suggest_discount + 0.1, Suggest_discount), Suggest_discount = ifelse(Suggest_discount > discount, Suggest_discount, discount), Sale_price = round(Regular.price * (1 - Suggest_discount), 2)) %>% arrange(cat, -time_yrs)
 write.csv(boxing_day, file = paste0("../Analysis/Boxing_day_deals1_", Sys.Date(), ".csv"), row.names = F)
 
+# ----------- Wholesale performance analysis 2023 2024 -------------
+library(reshape2)
+library(ggh4x)
+wholesale <- openxlsx::loadWorkbook(list.files(path = "../Wholesale/", pattern = "Wholesale_Invoices", full.names = T))
+wholesale_Xoro <- openxlsx::readWorkbook(wholesale, 2) %>% mutate(REF.NO = SO.Ref.Number, Date = as.Date(Date, origin = "1899-12-30"), Year = format(Date, "%Y"), Month = format(Date, "%m"), Currency = Currency.Code, Amount.Discount = Total.Discount, Tax = Total.Tax.Amount, Country = Ship.to.Country, State = Ship.To.State, Email = Main.Email) %>%
+  select(REF.NO, Date, Year, Month, Sales.Rep, Currency, Total.Amount, Shipping.Cost, Amount.Discount, Tax, Total.Qty, Country, State, Customer.Name, Email)
+Customers_Xoro <- wholesale_Xoro %>% distinct(Email, .keep_all = T) %>% `row.names<-`(.[, "Email"])
+wholesale_NS <- openxlsx::readWorkbook(wholesale, 1) %>% mutate(Date = as.Date(Date, origin = "1899-12-30"), Year = format(Date, "%Y"), Month = format(Date, "%m"), Total.Amount = Amount.Foreign.Currency, Amount.Discount = ifelse(is.na(Amount.Discount), 0, Amount.Discount), Tax = Amount.Transaction.Tax.Total, Total.Qty = TOTAL_QTY_R, Country = Shipping.Country.Code, State = Shipping.State.Province, Customer.Name = ifelse(Email %in% Customers_Xoro$Email, Customers_Xoro[Email, "Customer.Name"], Company.Name)) %>% 
+  select(REF.NO, Date, Year, Month, Sales.Rep, Currency, Total.Amount, Shipping.Cost, Amount.Discount, Tax, Total.Qty, Country, State, Customer.Name, Email)
+wholesale_Faire <- openxlsx::readWorkbook(wholesale, 3) %>% group_by(Order.Number) %>% mutate(REF.NO = Order.Number, Date = as.Date(Order.Date, origin = "1899-12-30"), Year = format(Date, "%Y"), Month = format(Date, "%m"), Sales.Rep = "Faire", Currency = "USD", Total.Amount = sum(Wholesale.Price), Shipping.Cost = 0, Amount.Discount = 0, Tax = 0, Total.Qty = sum(Quantity), Country = gsub("United States", "US-Faire", gsub("Canada", "CA", Country)), State = State, Customer.Name = Retailer.Name, Email = "") %>% ungroup() %>%
+  select(REF.NO, Date, Year, Month, Sales.Rep, Currency, Total.Amount, Shipping.Cost, Amount.Discount, Tax, Total.Qty, Country, State, Customer.Name, Email) %>% distinct(REF.NO, .keep_all = T) %>% filter(Year %in% c(2023, 2024))
+wholesale_2023_2024 <- rbind(wholesale_Faire, wholesale_Xoro, wholesale_NS, data.frame(REF.NO = "", Date = "", Year = c(2023, 2024), Month = "", Sales.Rep = "Taiwan", Currency = "USD", Total.Amount = c(580179.66, 366010.45), Shipping.Cost = c(2691, 1350), Amount.Discount = c(144259.5, 66224.11), Tax = c(0, 0), Total.Qty = c(37798, 21676), Country = "TW", State = "TW", Customer.Name = "Taobaby", Email = "taobabyjp@gmail.com"))
+wholesale_2023_2024_Country <- wholesale_2023_2024 %>% group_by(Country, Year) %>% summarise(Average.Amount = ifelse(Country == "TW", 0, mean(Total.Amount, na.rm = T)), Total.Amount = sum(Total.Amount), Total.Qty = sum(Total.Qty)) %>% ungroup() %>%
+  melt(id.vars = c("Year","Country"), variable.name = "Total") %>% filter(Country %in% c("AU", "CA", "CZ", "FR", "TW", "US", "US-Faire")) 
+(wholesale_2023_2024_Country_plot <- ggplot(wholesale_2023_2024_Country, aes(Country, value)) + 
+    geom_col(aes(fill = Year), position = position_dodge()) + 
+    scale_y_continuous(labels = scales::comma) + 
+    facet_grid(rows = vars(Total), scales = "free_y") + 
+    ggtitle("Wholesale annual amount and quantity in different countries") + xlab("") + ylab("") + theme_bw() + theme(plot.title = element_text(hjust = 0.5)))
+wholesale_2023_2024_SalesRep <- wholesale_2023_2024 %>% group_by(Sales.Rep, Year) %>% summarise(Average.Amount = ifelse(Sales.Rep %in% c("Taiwan", "Uniform"), 0, mean(Total.Amount, na.rm = T)), Total.Amount = sum(Total.Amount), Total.Qty = sum(Total.Qty)) %>% ungroup() %>%
+  melt(id.vars = c("Year","Sales.Rep"), variable.name = "Total")
+(wholesale_2023_2024_SalesRep_plot <- ggplot(wholesale_2023_2024_SalesRep, aes(Sales.Rep, value)) + 
+    geom_col(aes(fill = Year), position = position_dodge()) + 
+    scale_y_continuous(labels = scales::comma) + 
+    facet_grid(rows = vars(Total), scales = "free_y") + 
+    ggtitle("Wholesale annual amount and quantity for different Sales Reps") + xlab("") + ylab("") + 
+    theme_bw() + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 15, vjust = 1, hjust=1)))
+wholesale_2023_2024_State <- wholesale_2023_2024 %>% group_by(Country, State, Year) %>% summarise(Average.Amount = ifelse(Sales.Rep %in% c("Taiwan", "Uniform"), 0, mean(Total.Amount, na.rm = T)), Total.Amount = sum(Total.Amount), Total.Qty = sum(Total.Qty)) %>% ungroup() %>%
+  melt(id.vars = c("Year","Country", "State"), variable.name = "Total") %>% filter(Country %in% c("CA", "US"), !is.na(State), State != "-")
+(wholesale_2023_2024_State_plot <- ggplot(wholesale_2023_2024_State, aes(State, value)) + 
+    geom_col(aes(fill = Year), position = position_dodge()) + 
+    scale_y_continuous(labels = scales::comma) + 
+    facet_grid2(rows = vars(Total), cols = vars(Country), scales = "free", space = "free_x", independent = "y") + 
+    ggtitle("Wholesale annual amount and quantity in different States") + xlab("") + ylab("") + theme_bw() + 
+    theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 0.5)))
+pdf(file = "../Wholesale/Wholesale_summary_2023_2024.pdf", width = 13, height = 8)
+grid.arrange(wholesale_2023_2024_SalesRep_plot, wholesale_2023_2024_Country_plot, ncol=2)
+(wholesale_2023_2024_State_plot)
+dev.off()
+wholesale_2023_2024_Store <- wholesale_2023_2024 %>% group_by(Customer.Name) %>% mutate(Start.Date = min(Date)) %>%
+  group_by(Customer.Name, Year) %>% summarise(Email = Email[1], Sales.Rep = Sales.Rep[1], Start.Date = Start.Date[1], Country = Country[1], State = State[1], Average.Amount = round(mean(Total.Amount, na.rm = T), 2), Total.Amount = sum(Total.Amount), Total.Qty = sum(Total.Qty)) %>%
+  tidyr::pivot_wider(names_from  = c(Year), values_from = c('Total.Amount', 'Average.Amount', 'Total.Qty')) %>% arrange(Sales.Rep, desc(Total.Amount_2024)) %>% mutate(Growth.Rate = ifelse(is.na(Total.Amount_2023), 1, ifelse(is.na(Total.Amount_2024), -1, round((Total.Amount_2024 - Total.Amount_2023)/Total.Amount_2023, 3))))
+write.csv(wholesale_2023_2024_Store, file = "../Wholesale/wholesale_2023_2024_Store.csv", row.names = F, na = "", quote = F)
