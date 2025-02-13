@@ -319,7 +319,8 @@ price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", 
 mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(!is.na(Name), !duplicated(toupper(Name))) %>% `row.names<-`(toupper(.[, "Name"])) 
-category_exclude <- c("FVMU", "PJWU","PLAU", "PTAU", "STORE", "TPLU", "TPSU", "TSWU", "TTLU", "TTSU", "WJAU", "WPSU", "XBMU")
+#category_exclude <- c("FVMU", "PJWU","PLAU", "PTAU", "STORE", "TPLU", "TPSU", "TSWU", "TTLU", "TTSU", "WJAU", "WPSU", "XBMU")
+category_exclude <- c("")
 clover_item_upload <- data.frame(Clover.ID = "", Name = toupper(mastersku[mastersku$MSKU.Status == "Active", "MSKU"])) %>% filter(!is.na(Name)) %>% 
   mutate(cat = mastersku[Name, "Category.SKU"], Alternate.Name = woo[Name, "Name"], Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Price.Unit = NA, Tax.Rates = ifelse(woo[Name, "Tax.class"] == "full", "GST+PST", "GST"), Tax.Rates = ifelse(is.na(Tax.Rates), "GST", Tax.Rates), Cost = 0, Product.Code = gsub("/.*", "", mastersku[Name, "UPC.Active"]), SKU = Name, Modifier.Groups = NA, Quantity = ifelse(Name %in% clover_item$Name, clover_item[Name, "Quantity"], 0), Printer.Labels = NA, Hidden = "No", Non.revenue.item = "No") %>%
   filter(!(cat %in% category_exclude)) %>% arrange(cat, Name)
@@ -335,6 +336,17 @@ deleteData(clover, sheet = "Categories", cols = 1:1000, rows = 1:1000, gridExpan
 writeData(clover, sheet = "Categories", clover_cat_upload, colNames = F)
 openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
+
+# ------------ Prep for 3PL CA East -------------------
+East <- c("MB", "ON", "QC", "NB", "NS", "NL", "PE")
+#cat <- c('AJP', 'AWP', 'BSL', 'BST', 'FHA', 'FMG', 'HBU', 'HLH', 'ICP', 'IPC', 'IPS', 'ISJ', 'KHM', 'MBH', 'MKMT', 'MWBF', 'MWBS', 'MWPS', 'PWJ', 'SKB-INSOL', 'UST')
+mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(toupper(.[, "MSKU"]))
+JJ_orders <- read.csv("../woo/orders-20241001-20250131.csv", as.is = T) %>% filter(Order.Status == "Completed", Country.Code..Shipping. != "", SKU != "") %>% mutate(Category = ifelse(SKU %in% row.names(mastersku), mastersku[SKU, "Category.SKU"], gsub("-.*", "", SKU)), Country = Country.Code..Shipping., State = State.Code..Shipping., Qty = Quantity....Refund.) 
+JJ_orders_CA <- JJ_orders %>% group_by(Category, Country) %>% summarise(Quantity = sum(Qty)) %>% group_by(Category) %>% mutate(Total_qty = sum(Quantity), Proportion = round(Quantity/Total_qty, 2)) %>% filter(Country == "CA")
+JJ_orders_East <- JJ_orders %>% filter(Country == "CA") %>% mutate(Region = ifelse(State %in% East, "East", "West"))%>% group_by(Category, Region) %>% summarise(Quantity = sum(Qty)) %>% group_by(Category) %>% mutate(Total_qty = sum(Quantity), Proportion = round(Quantity/Total_qty, 2)) %>% filter(Region == "East") %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Category"])) 
+JJ_orders_propotion <- data.frame(Category = JJ_orders_CA$Category, CA_propotion = JJ_orders_CA$Proportion) %>% mutate(East_proportion = ifelse(Category %in% JJ_orders_East$Category, JJ_orders_East[Category, "Proportion"], 0))
+#JJ_orders_propotion <- JJ_orders_propotion %>% filter(Category %in% cat)
+write.csv(JJ_orders_propotion, file = paste0("../woo/JJ_orders_propotion_", Sys.Date(), ".csv"), row.names = F)
 
 # ------------ upload regular POs -------------------
 library(stringi)
