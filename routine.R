@@ -341,7 +341,7 @@ library(stringi)
 season <- "25F"
 folder <- stri_remove_empty(gsub(" *- *sent", "", gsub(paste0("\\.\\.\\/PO\\/order\\/", season, "\\/"), "", list.files(path = paste0("../PO/order/", season, "/"), pattern = "^P"))))
 SeasonStart <- read.csv("../PO/SeasonStart.csv", as.is = T) %>% mutate(receive_date = format(as.Date(paste0(arrival_date, "-2025"), format = "%d-%B-%Y"), "%m/%d/%Y")) %>% `row.names<-`(.[, "category"]) 
-PO_NS <- data.frame(); total <- 0; items <- 0; ReceiveDate <- 0
+PO_NS <- data.frame(); total <- 0; items <- 0
 for(f in folder){
   print(ReceiveDate)
   memo <- f; ID <- trimws(gsub("-.*", "", f)); category <- trimws(str_split_1(f, "-")[2]); vendor <- trimws(str_split_1(f, "-")[3])
@@ -414,12 +414,11 @@ for(f in folder){
     }
   }
 }
-print(ReceiveDate)
 print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_NS$QUANTITY), total))
 write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_regular_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
 # ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits -------------------
-ID <- "P479"; season <- "25F"; type <- "FR-Petits"; warehouse <- "WH-CHINA"
+ID <- "P406"; season <- "25S"; type <- "CA-Clement"; warehouse <- "WH-SURREY"
 file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
 PO_NS <- data.frame(); total <- 0; items <- 0; CAT <- c()
 for(f in file){
