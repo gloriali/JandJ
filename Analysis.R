@@ -546,41 +546,95 @@ wholesale_2023_2024_Store <- wholesale_2023_2024 %>% group_by(Customer.Name) %>%
 write.csv(wholesale_2023_2024_Store, file = "../Wholesale/wholesale_2023_2024_Store.csv", row.names = F, na = "", quote = F)
 
 # ----------- Showroom performance analysis 2024 -------------
-start_inventory <- openxlsx::read.xlsx("../Clover/Archive/inventory20240909.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
-end_inventory <- openxlsx::read.xlsx("../Clover/inventory20250102.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
-SO <- read.csv("../Clover/Sales240813-241230/LineItemsGroupedByItem-20240909-20241231.csv", as.is = T) %>% group_by(Item.Name) %>% summarise(Qty = sum(X..of.Items.Sold)) %>% as.data.frame() %>% `row.names<-`(.[, "Item.Name"]) 
-TO_out <- read.csv("../Clover/Sales240813-241230/TO_Surrey.csv", as.is = T) %>% `row.names<-`(.[, "ITEM"])
-TO_in <- data.frame()
-for(f in list.files("../Clover/Sales240813-241230/", pattern = "order", full.names = T)){
-  TO_in <- rbind(TO_in, read.csv(f, as.is = T))
-}
-TO_in <- TO_in %>% group_by(ITEM) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(.[, "ITEM"]) 
-discrepency <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start_inventory[Name, "Quantity"], TO_in = TO_in[Name, "Qty"], TO_out = TO_out[Name, "Quantity"], SO = SO[Name, "Qty"])
-discrepency[is.na(discrepency)] <- 0
-discrepency <- discrepency %>% mutate(Category = gsub("-.*", "", Name)) %>% group_by(Category) %>% mutate(start = sum(start), end = sum(Quantity), TO_in = sum(TO_in), TO_out = sum(TO_out), SO = sum(SO)) %>% select(Category, start, end, TO_in, TO_out, SO) %>% distinct(Category, .keep_all = T) %>%
-  filter((start + end + SO) != 0) %>% mutate(discrepency = end - (start + TO_in -TO_out - SO)) %>% arrange(desc(SO))
-Payment <- read.csv("../Clover/Sales240813-241230/Payments-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% filter(Result == "SUCCESS", Amount != 0) %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name)
+library(scales)
+library(lubridate)
+library(gridExtra)
+Payment <- read.csv("../Clover/Sales240813-241230/Payments-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% filter(Result == "SUCCESS", Amount != 0) %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name, Payment.ID)
+Refund <- read.csv("../Clover/Sales240813-241230/Refunds-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Refund.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% select(Date, Month, DayOfWeek, Refund.Amount, Refund.ID)
 Payment_daily <- Payment %>% group_by(Date) %>% summarise(Amount = sum(Amount), N = n())
 days <- seq(from = as.Date("2024-09-09"), to = as.Date("2024-12-24"), by = "days")
 workdays <- days[wday(days) != 1 & !days %in% c("2024-10-14", "2024-11-11")]
 Payment_daily <- rbind(Payment_daily, data.frame(Date = workdays[!workdays %in% Payment_daily$Date], Amount = 0, N = 0)) %>% arrange(Date)
-Customer <- Payment %>% filter(Customer.Name != " ") %>% group_by(Customer.Name) %>% summarise(N = n())
+JJR_payment <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>% distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date))) %>% filter(Shipping.Zone == "Canada BC", Date < "2024-12-25")
 (trend <- ggplot(Payment, aes(Date, Amount)) + 
-    geom_bar(stat = "identity", position = "stack") + 
+    geom_bar(stat = "identity", position = "stack", width = 0.8) + 
     ggtitle("Sales trend 2024-09-09 to 2024-12-31") + 
     theme_bw())
 Payment_month <- Payment %>% group_by(Month) %>% summarise(Amount = sum(Amount), N = n()) %>% mutate(Average = Amount/N, Month = factor(Month, level = c("Sep", "Oct", "Nov", "Dec")))
 Revenue_month <- ggplot(Payment_month, aes(Month, Amount)) + 
-  geom_bar(stat = "identity", position = "stack") + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
   ggtitle("Revenue by Month") + 
   theme_bw()
 N_month <- ggplot(Payment_month, aes(Month, N)) + 
-  geom_bar(stat = "identity", position = "stack") + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
   ggtitle("No. of orders by Month") + 
   theme_bw()
 Average_month <- ggplot(Payment_month, aes(Month, Average)) + 
-  geom_bar(stat = "identity", position = "stack") + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
   ggtitle("Average order size by Month") + 
   theme_bw()
-
-
+grid.arrange(Revenue_month, N_month, Average_month, nrow = 1)
+Payment_week <- Payment %>% group_by(DayOfWeek) %>% summarise(Amount = sum(Amount), N = n()) %>% mutate(Average = Amount/N, DayOfWeek = factor(DayOfWeek, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
+Revenue_week <- ggplot(Payment_week, aes(DayOfWeek, Amount)) + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
+  ggtitle("Revenue by day of week") + 
+  theme_bw()
+N_week <- ggplot(Payment_week, aes(DayOfWeek, N)) + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
+  ggtitle("No. of orders by day of week") + 
+  theme_bw()
+Average_week <- ggplot(Payment_week, aes(DayOfWeek, Average)) + 
+  geom_bar(stat = "identity", position = "stack", width = 0.8) + 
+  ggtitle("Average order size by day of week") + 
+  theme_bw()
+grid.arrange(Revenue_week, N_week, Average_week, nrow = 1)
+Category <- read.csv("../Clover/Sales240813-241230/LineItemsExport-20240909-20241231.csv", as.is = T)%>% mutate(Month = format(as.Date(gsub(" .*", "", Line.Item.Date), format = "%d-%b-%Y"), "%b"), Category = gsub("-.*", "", Item.Name)) %>% filter(Order.Payment.State == "Paid") %>% group_by(Category, Month) %>% summarise(Qty = n()) %>% arrange(Month, desc(Qty))
+(Category_alltime <- ggplot(Category, aes(reorder(Category, Qty), Qty)) + 
+    geom_bar(position = "stack", stat = "identity", width = 0.8) + 
+    coord_flip(xlim = c(length(unique(Category$Category))-9, length(unique(Category$Category)))) + 
+    xlab("") + ylab("") + 
+    ggtitle("Top 10 best selling categories 2024-09-09 to 2024-12-24") +
+    theme_bw())
+Category_Sep <- ggplot(Category %>% filter(Month == "Sep"), aes(reorder(Category, Qty), Qty)) + 
+  geom_bar(position = "identity", stat = "identity", width = 0.8) + 
+  coord_flip(xlim = c(length(unique((Category %>% filter(Month == "Sep"))$Category))-9, length(unique((Category %>% filter(Month == "Sep"))$Category)))) + 
+  xlab("") + ylab("") + 
+  ggtitle("Top 10 in Sep") +
+  theme_bw()
+Category_Oct <- ggplot(Category %>% filter(Month == "Oct"), aes(reorder(Category, Qty), Qty)) + 
+  geom_bar(position = "identity", stat = "identity", width = 0.8) + 
+  coord_flip(xlim = c(length(unique((Category %>% filter(Month == "Oct"))$Category))-9, length(unique((Category %>% filter(Month == "Oct"))$Category)))) + 
+  xlab("") + ylab("") + 
+  ggtitle("Top 10 in Oct") +
+  theme_bw()
+Category_Nov <- ggplot(Category %>% filter(Month == "Nov"), aes(reorder(Category, Qty), Qty)) + 
+  geom_bar(position = "identity", stat = "identity", width = 0.8) + 
+  coord_flip(xlim = c(length(unique((Category %>% filter(Month == "Nov"))$Category))-9, length(unique((Category %>% filter(Month == "Nov"))$Category)))) + 
+  xlab("") + ylab("") + 
+  ggtitle("Top 10 in Nov") +
+  theme_bw()
+Category_Dec <- ggplot(Category %>% filter(Month == "Dec"), aes(reorder(Category, Qty), Qty)) + 
+  geom_bar(position = "identity", stat = "identity", width = 0.8) + 
+  coord_flip(xlim = c(length(unique((Category %>% filter(Month == "Dec"))$Category))-9, length(unique((Category %>% filter(Month == "Dec"))$Category)))) + 
+  xlab("") + ylab("") + 
+  ggtitle("Top 10 in Dec") +
+  theme_bw()
+grid.arrange(Category_Sep, Category_Oct, Category_Nov, Category_Dec, nrow = 2)
+customer <- read.csv(list.files(path = "../Clover/", pattern = paste0("Customers-", format(Sys.Date(), "%Y%m%d")), full.names = T), as.is = T) %>%
+  mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "") %>% `row.names<-`(.[, "Name"])
+Customer_Clover <- Payment %>% mutate(Email = gsub("\\,.*", "", gsub('\\"', "", customer[Customer.Name, "Email.Address"]))) %>% group_by(Email) %>% summarise(N = n()) %>% filter(!is.na(Email))
+new_Clover <- read.csv("../Clover/Sales240813-241230/non_included.csv", as.is = T) %>% filter(Email %in% Customer_Clover$Email)
+new_website <- new_Clover %>% filter(Email %in% JJR_payment$Customer.User.Email)
+netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
+start_inventory <- openxlsx::read.xlsx("../Clover/Archive/inventory20240909.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+end_inventory <- openxlsx::read.xlsx("../Clover/inventory20250102.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+SO <- read.csv("../Clover/Sales240813-241230/LineItemsGroupedByItem-20240909-20241231.csv", as.is = T) %>% group_by(Item.Name) %>% summarise(Qty = sum(X..of.Items.Sold)) %>% as.data.frame() %>% `row.names<-`(.[, "Item.Name"]) 
+TO_out <- read.csv("../Clover/Sales240813-241230/TO_Surrey.csv", as.is = T) %>% `row.names<-`(.[, "ITEM"])
+TO_in <- data.frame()
+for(f in list.files("../Clover/Sales240813-241230/", pattern = "^order", full.names = T)){
+  TO_in <- rbind(TO_in, read.csv(f, as.is = T))
+}
+TO_in <- TO_in %>% group_by(ITEM) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(.[, "ITEM"]) 
+discrepancy <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start_inventory[Name, "Quantity"], TO_in = TO_in[Name, "Qty"], TO_out = TO_out[Name, "Quantity"], SO = SO[Name, "Qty"])
+discrepancy[is.na(discrepancy)] <- 0
+discrepancy <- discrepancy %>% mutate(discrepancy = Quantity - (start + TO_in -TO_out - SO)) %>% arrange(desc(abs(discrepancy))) %>% filter(discrepancy < -3 | discrepancy > 5)
