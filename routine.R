@@ -511,7 +511,7 @@ OverReceive <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_",
 if(nrow(OverReceive)){
   View(OverReceive)
   PO_OverReceive <- OverReceive %>% mutate(PO.TYPE = "Over Received", CATEGORY = "MIX", SEASON = season, REF.NO = paste0("Over.", RefNo), WAREHOUSE = gsub("FBA", "WH-AMZ : FBA", warehouse), VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("Over receiving in shipment ", RefNo), ITEM. = ITEM, QUANTITY. = Qty, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
-    select(PO.TYPE:External.ID) %>% group_by(External.ID, ITEM.) %>% mutate(QUANTITY. = sum(QUANTITY.)) %>% distinct(External.ID, ITEM., .keep_all = T) %>% ungroup() %>% rename_with(~ gsub("\\.", " ", .))
+    select(PO.TYPE:External.ID) %>% group_by(ITEM.) %>% mutate(QUANTITY. = sum(QUANTITY.)) %>% distinct(ITEM., .keep_all = T) %>% ungroup() %>% rename_with(~ gsub("\\.", " ", .))
   write.csv(PO_OverReceive, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_PO_", RefNo, "_OverReceive.csv"), row.names = F, na = "")
 }else{
   print("No over-receiving. ")
