@@ -1,0 +1,117 @@
+---
+title: "Showroom Performance"
+output: html_document
+date: "2025-03-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(stringr)
+library(openxlsx)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(knitr)
+library(lubridate)
+library(gridExtra)
+Payment <- read.csv("../Clover/Sales240813-241230/Payments-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% filter(Result == "SUCCESS", Amount != 0) %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name, Payment.ID)
+Refund <- read.csv("../Clover/Sales240813-241230/Refunds-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Refund.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% select(Date, Month, DayOfWeek, Refund.Amount, Refund.ID)
+Payment_daily <- Payment %>% group_by(Date) %>% summarise(Amount = sum(Amount), N = n())
+days <- seq(from = as.Date("2024-09-09"), to = as.Date("2024-12-24"), by = "days")
+workdays <- days[wday(days) != 1 & !days %in% c("2024-10-14", "2024-11-11")]
+Payment_daily <- rbind(Payment_daily, data.frame(Date = workdays[!workdays %in% Payment_daily$Date], Amount = 0, N = 0)) %>% arrange(Date)
+```
+
+This is report of Richmond showroom performance from Sept 09 2024 (NetSuite integration) to Dec 31 2024.  
+
+## Summary
+
+  * Total Revenue: __`r dollar(sum(Payment$Amount)-sum(Refund$Refund.Amount), accuracy = 0.01)`__ 
+  * Total Sales:  __`r dollar(sum(Payment$Amount), accuracy = 0.01)`__ 
+  * Total No. of orders:  __`r nrow(Payment)`__
+  * Total Refund:  __`r dollar(sum(Refund$Refund.Amount), accuracy = 0.01)`__ 
+  * Total No. of refunds:  __`r nrow(Refund)`__ (__`r percent(nrow(Refund)/nrow(Payment))`__)
+  * Average daily sales:  __`r dollar(mean(Payment_daily$Amount), accuracy = 0.01)`__
+  * Average daily No. of orders:  __`r round(mean(Payment_daily$N))`__
+  * Average order size:  __`r dollar(sum(Payment$Amount)/nrow(Payment), accuracy = 0.01)`__ 
+
+```{r summary, echo=FALSE, fig.height=4, fig.width=12}
+(trend <- ggplot(Payment, aes(Date, Amount)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("Sales trend 2024-09-09 to 2024-12-31") + 
+   theme_bw())
+```
+
+### Sales by month
+```{r month, echo=FALSE, fig.height=4, fig.width=12}
+Payment_month <- Payment %>% group_by(Month) %>% summarise(Amount = sum(Amount), N = n()) %>% mutate(Average = Amount/N, Month = factor(Month, level = c("Sep", "Oct", "Nov", "Dec")))
+Revenue_month <- ggplot(Payment_month, aes(Month, Amount)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("Revenue by Month") + 
+   theme_bw()
+N_month <- ggplot(Payment_month, aes(Month, N)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("No. of orders by Month") + 
+   theme_bw()
+Average_month <- ggplot(Payment_month, aes(Month, Average)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("Average order size by Month") + 
+   theme_bw()
+grid.arrange(Revenue_month, N_month, Average_month, nrow = 1)
+```
+
+### Sales by day of week
+```{r week, echo=FALSE, fig.height=4, fig.width=12}
+Payment_week <- Payment %>% group_by(DayOfWeek) %>% summarise(Amount = sum(Amount), N = n()) %>% mutate(Average = Amount/N, DayOfWeek = factor(DayOfWeek, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
+Revenue_week <- ggplot(Payment_week, aes(DayOfWeek, Amount)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("Revenue by day of week") + 
+   theme_bw()
+N_week <- ggplot(Payment_week, aes(DayOfWeek, N)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("No. of orders by day of week") + 
+   theme_bw()
+Average_week <- ggplot(Payment_week, aes(DayOfWeek, Average)) + 
+   geom_bar(stat = "identity", position = "stack") + 
+   ggtitle("Average order size by day of week") + 
+   theme_bw()
+grid.arrange(Revenue_week, N_week, Average_week, nrow = 1)
+```
+
+### Sales by category
+
+  * The top 5 best selling categories by quantity are: WJA, BTL, BTB, WPF, SWS
+  * Return quantities from refunds/exchanges are not included in the form below because it's very difficult to extract that information from Clover, hence the generally positive discrepancy (inventory at end of year more than transfers in - sales). KBS and SKB missing inventory are most likely due to some with missing barcode were sold under MISC. BRC discrepancy needs further investigating. 
+  * We need to record refund/exchange separately. Please record all returns and exchanges in `TWK 2020 share\twk general\2 - show room operations\0-Return Exchange Tracking.xlsx` in the future. 
+
+```{r category, echo=FALSE, asis=T}
+netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
+start_inventory <- openxlsx::read.xlsx("../Clover/Archive/inventory20240909.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+end_inventory <- openxlsx::read.xlsx("../Clover/inventory20250102.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+SO <- read.csv("../Clover/Sales240813-241230/LineItemsGroupedByItem-20240909-20241231.csv", as.is = T) %>% group_by(Item.Name) %>% summarise(Qty = sum(X..of.Items.Sold)) %>% as.data.frame() %>% `row.names<-`(.[, "Item.Name"]) 
+TO_out <- read.csv("../Clover/Sales240813-241230/TO_Surrey.csv", as.is = T) %>% `row.names<-`(.[, "ITEM"])
+TO_in <- data.frame()
+for(f in list.files("../Clover/Sales240813-241230/", pattern = "order", full.names = T)){
+  TO_in <- rbind(TO_in, read.csv(f, as.is = T))
+}
+TO_in <- TO_in %>% group_by(ITEM) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(.[, "ITEM"]) 
+discrepancy <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start_inventory[Name, "Quantity"], TO_in = TO_in[Name, "Qty"], TO_out = TO_out[Name, "Quantity"], SO = SO[Name, "Qty"])
+discrepancy[is.na(discrepancy)] <- 0
+discrepancy <- discrepancy %>% mutate(Category = gsub("-.*", "", Name)) %>% group_by(Category) %>% mutate(start = sum(start), end = sum(Quantity), TO_in = sum(TO_in), TO_out = sum(TO_out), SO = sum(SO)) %>% select(Category, SO, start, end, TO_in, TO_out) %>% distinct(Category, .keep_all = T) %>%
+  filter((start + end + SO) != 0) %>% mutate(discrepancy = end - (start + TO_in -TO_out - SO)) %>% arrange(desc(SO))
+kable(discrepancy, format = "simple", row.names = F, align = "crrrrrr")
+```
+
+### Customer analysis
+
+```{r customer, echo=F}
+Customer <- Payment %>% filter(Customer.Name != " ") %>% group_by(Customer.Name) %>% summarise(N = n())
+
+```
+
+  * No. of recorded customers: __`r nrow(Customer) - 1`__
+  * No. of repeat customers: __`r nrow(Customer %>% filter(N > 1)) -1`__ (__`r percent((nrow(Customer %>% filter(N > 1)) -1)/(nrow(Customer) - 1))`__)
+  
+
+

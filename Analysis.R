@@ -544,3 +544,43 @@ wholesale_2023_2024_Store <- wholesale_2023_2024 %>% group_by(Customer.Name) %>%
   group_by(Customer.Name, Year) %>% summarise(Email = Email[1], Sales.Rep = Sales.Rep[1], Start.Date = Start.Date[1], Country = Country[1], State = State[1], Average.Amount = round(mean(Total.Amount, na.rm = T), 2), Total.Amount = sum(Total.Amount), Total.Qty = sum(Total.Qty)) %>%
   tidyr::pivot_wider(names_from  = c(Year), values_from = c('Total.Amount', 'Average.Amount', 'Total.Qty')) %>% arrange(Sales.Rep, desc(Total.Amount_2024)) %>% mutate(Growth.Rate = ifelse(is.na(Total.Amount_2023), 1, ifelse(is.na(Total.Amount_2024), -1, round((Total.Amount_2024 - Total.Amount_2023)/Total.Amount_2023, 3))))
 write.csv(wholesale_2023_2024_Store, file = "../Wholesale/wholesale_2023_2024_Store.csv", row.names = F, na = "", quote = F)
+
+# ----------- Showroom performance analysis 2024 -------------
+start_inventory <- openxlsx::read.xlsx("../Clover/Archive/inventory20240909.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+end_inventory <- openxlsx::read.xlsx("../Clover/inventory20250102.xlsx", sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity)) %>% `row.names<-`(.[, "Name"])
+SO <- read.csv("../Clover/Sales240813-241230/LineItemsGroupedByItem-20240909-20241231.csv", as.is = T) %>% group_by(Item.Name) %>% summarise(Qty = sum(X..of.Items.Sold)) %>% as.data.frame() %>% `row.names<-`(.[, "Item.Name"]) 
+TO_out <- read.csv("../Clover/Sales240813-241230/TO_Surrey.csv", as.is = T) %>% `row.names<-`(.[, "ITEM"])
+TO_in <- data.frame()
+for(f in list.files("../Clover/Sales240813-241230/", pattern = "order", full.names = T)){
+  TO_in <- rbind(TO_in, read.csv(f, as.is = T))
+}
+TO_in <- TO_in %>% group_by(ITEM) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(.[, "ITEM"]) 
+discrepency <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start_inventory[Name, "Quantity"], TO_in = TO_in[Name, "Qty"], TO_out = TO_out[Name, "Quantity"], SO = SO[Name, "Qty"])
+discrepency[is.na(discrepency)] <- 0
+discrepency <- discrepency %>% mutate(Category = gsub("-.*", "", Name)) %>% group_by(Category) %>% mutate(start = sum(start), end = sum(Quantity), TO_in = sum(TO_in), TO_out = sum(TO_out), SO = sum(SO)) %>% select(Category, start, end, TO_in, TO_out, SO) %>% distinct(Category, .keep_all = T) %>%
+  filter((start + end + SO) != 0) %>% mutate(discrepency = end - (start + TO_in -TO_out - SO)) %>% arrange(desc(SO))
+Payment <- read.csv("../Clover/Sales240813-241230/Payments-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% filter(Result == "SUCCESS", Amount != 0) %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name)
+Payment_daily <- Payment %>% group_by(Date) %>% summarise(Amount = sum(Amount), N = n())
+days <- seq(from = as.Date("2024-09-09"), to = as.Date("2024-12-24"), by = "days")
+workdays <- days[wday(days) != 1 & !days %in% c("2024-10-14", "2024-11-11")]
+Payment_daily <- rbind(Payment_daily, data.frame(Date = workdays[!workdays %in% Payment_daily$Date], Amount = 0, N = 0)) %>% arrange(Date)
+Customer <- Payment %>% filter(Customer.Name != " ") %>% group_by(Customer.Name) %>% summarise(N = n())
+(trend <- ggplot(Payment, aes(Date, Amount)) + 
+    geom_bar(stat = "identity", position = "stack") + 
+    ggtitle("Sales trend 2024-09-09 to 2024-12-31") + 
+    theme_bw())
+Payment_month <- Payment %>% group_by(Month) %>% summarise(Amount = sum(Amount), N = n()) %>% mutate(Average = Amount/N, Month = factor(Month, level = c("Sep", "Oct", "Nov", "Dec")))
+Revenue_month <- ggplot(Payment_month, aes(Month, Amount)) + 
+  geom_bar(stat = "identity", position = "stack") + 
+  ggtitle("Revenue by Month") + 
+  theme_bw()
+N_month <- ggplot(Payment_month, aes(Month, N)) + 
+  geom_bar(stat = "identity", position = "stack") + 
+  ggtitle("No. of orders by Month") + 
+  theme_bw()
+Average_month <- ggplot(Payment_month, aes(Month, Average)) + 
+  geom_bar(stat = "identity", position = "stack") + 
+  ggtitle("Average order size by Month") + 
+  theme_bw()
+
+
