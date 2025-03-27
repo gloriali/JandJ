@@ -1,7 +1,7 @@
 ---
 title: "Showroom Performance"
 output: html_document
-date: "2025-03-24"
+date: "`r Sys.Date()`"
 ---
 
 ```{r setup, include=FALSE}
@@ -41,6 +41,22 @@ This is report of Richmond showroom performance from Sept 09 2024 (NetSuite inte
    geom_bar(stat = "identity", position = "stack", width = 0.8) + 
    ggtitle("Sales trend 2024-09-09 to 2024-12-31") + 
    theme_bw())
+```
+
+### Influence to JJ Website
+
+  * JJ Website in Canada BC sales indeed show a significant decrease in Sept-Nov in 2024 compared to 2023 corresponding to Richmond showroom opening time.  
+  * However, Website sales in Ontario and US as a whole also show some decrease in Sept and Oct in 2024, not as much as BC, so there may be other factors for the decrease other than offline purchases. 
+
+```{r JJ, warning=F, fig.width=14}
+JJR_2024 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2024", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2024-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
+JJR_2023 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20230909-20231224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2023", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2023-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
+JJR_23_24 <- rbind(JJR_2023, JJR_2024) %>% data.table::melt(id.vars = c("Year", "Month", "Country", "State"))
+(JJR_23_24_CA <- ggplot(JJR_23_24, aes(factor(Month, levels = c("Sep", "Oct", "Nov", "Dec")), value, fill = Year)) + 
+    geom_bar(position = position_dodge(), stat = "identity") + 
+    facet_grid(variable ~ State, scales = "free") + 
+    xlab("") + ylab("") + ggtitle("Website sales changes in Sept-Dec 2024") + 
+    theme_bw())
 ```
 
 ### Sales by month
@@ -122,17 +138,19 @@ grid.arrange(Category_Sep, Category_Oct, Category_Nov, Category_Dec, nrow = 2)
 ### Customer analysis
 
 ```{r customer}
-customer <- read.csv(list.files(path = "../Clover/", pattern = paste0("Customers-", format(Sys.Date(), "%Y%m%d")), full.names = T), as.is = T) %>%
+customer <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Customers-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>%
   mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "") %>% `row.names<-`(.[, "Name"])
 Customer_Clover <- Payment %>% mutate(Email = gsub("\\,.*", "", gsub('\\"', "", customer[Customer.Name, "Email.Address"]))) %>% group_by(Email) %>% summarise(N = n()) %>% filter(!is.na(Email))
 new_Clover <- read.csv("../Clover/Sales240813-241230/non_included.csv", as.is = T) %>% filter(Email %in% Customer_Clover$Email)
 new_website <- new_Clover %>% filter(Email %in% JJR_payment$Customer.User.Email)
+Clover_website <- Customer_Clover %>% filter(Email %in% JJR_payment$Customer.User.Email)
 ```
 
   * No. of recorded customers: __`r nrow(Customer_Clover)`__
   * No. of repeat customers: __`r nrow(Customer_Clover %>% filter(N > 1))`__ (__`r percent(nrow(Customer_Clover %>% filter(N > 1))/nrow(Customer_Clover))`__)
   * Estimated No. of new customers from the showroom (not previously shopped on JJ website, but did not exclude those previously shopped on Amazon): __`r nrow(new_Clover)`__ (__`r percent(nrow(new_Clover)/nrow(Customer_Clover))`__) 
   * No. of new customers from the showroom who later on shopped on JJ website: __`r nrow(new_website)`__ (__`r percent(nrow(new_website)/nrow(new_Clover))`__)
+  * No. of customers who shopped on both JJ website and showroom: __`r nrow(Clover_website)`__ (__`r percent(nrow(Clover_website)/nrow(Customer_Clover))`__ of all showroom customers)
   
 ### Inventory verification
 

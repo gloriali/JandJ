@@ -556,6 +556,14 @@ days <- seq(from = as.Date("2024-09-09"), to = as.Date("2024-12-24"), by = "days
 workdays <- days[wday(days) != 1 & !days %in% c("2024-10-14", "2024-11-11")]
 Payment_daily <- rbind(Payment_daily, data.frame(Date = workdays[!workdays %in% Payment_daily$Date], Amount = 0, N = 0)) %>% arrange(Date)
 JJR_payment <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>% distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date))) %>% filter(Shipping.Zone == "Canada BC", Date < "2024-12-25")
+JJR_2024 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2024", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2024-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
+JJR_2023 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20230909-20231224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2023", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2023-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
+JJR_23_24 <- rbind(JJR_2023, JJR_2024) %>% data.table::melt(id.vars = c("Year", "Month", "Country", "State"))
+(JJR_23_24_CA <- ggplot(JJR_23_24, aes(factor(Month, levels = c("Sep", "Oct", "Nov", "Dec")), value, fill = Year)) + 
+    geom_bar(position = position_dodge(), stat = "identity") + 
+    facet_grid(variable ~ State, scales = "free") + 
+    xlab("") + ylab("") + ggtitle("Website sales changes in Sept-Dec 2024") + 
+    theme_bw())
 (trend <- ggplot(Payment, aes(Date, Amount)) + 
     geom_bar(stat = "identity", position = "stack", width = 0.8) + 
     ggtitle("Sales trend 2024-09-09 to 2024-12-31") + 
@@ -638,3 +646,15 @@ TO_in <- TO_in %>% group_by(ITEM) %>% summarise(Qty = sum(Quantity)) %>% as.data
 discrepancy <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start_inventory[Name, "Quantity"], TO_in = TO_in[Name, "Qty"], TO_out = TO_out[Name, "Quantity"], SO = SO[Name, "Qty"])
 discrepancy[is.na(discrepancy)] <- 0
 discrepancy <- discrepancy %>% mutate(discrepancy = Quantity - (start + TO_in -TO_out - SO)) %>% arrange(desc(abs(discrepancy))) %>% filter(discrepancy < -3 | discrepancy > 5)
+
+# ----------- AMZ BTB returns FW24 -------------
+AMZ_CA_return1 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-241001-241130.tsv", sep = "\t", as.is = T, header = T)
+AMZ_CA_return2 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-241201-250131.tsv", sep = "\t", as.is = T, header = T)
+AMZ_CA_return3 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-250201-250326.tsv", sep = "\t", as.is = T, header = T)
+AMZ_CA_return <- rbind(AMZ_CA_return1, rbind(AMZ_CA_return2, AMZ_CA_return3)) %>% filter(grepl("BTB", Merchant.SKU)) %>% select(Order.ID, Label.cost, Currency.code, Merchant.SKU, Return.quantity, Order.amount, Order.quantity, Refunded.amount)
+AMZ_US_return1 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-241001-241130.tsv", sep = "\t", as.is = T, header = T)
+AMZ_US_return2 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-241201-250131.tsv", sep = "\t", as.is = T, header = T)
+AMZ_US_return3 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-250201-250326.tsv", sep = "\t", as.is = T, header = T)
+AMZ_US_return <- rbind(AMZ_US_return1, rbind(AMZ_US_return2, AMZ_US_return3)) %>% filter(grepl("BTB", Merchant.SKU)) %>% select(Order.ID, Label.cost, Currency.code, Merchant.SKU, Return.quantity, Order.amount, Order.quantity, Refunded.amount)
+AMZ_return <- rbind(AMZ_CA_return, AMZ_US_return) %>% mutate(Refunded.amount = ifelse(is.na(Refunded.amount), Order.amount*Return.quantity/Order.quantity, Refunded.amount))
+write.csv(AMZ_return, file = "../Analysis/BTBreturns/AMZ_return_BTB.csv", row.names = F)
