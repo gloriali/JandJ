@@ -49,14 +49,22 @@ This is report of Richmond showroom performance from Sept 09 2024 (NetSuite inte
   * However, Website sales in Ontario and US as a whole also show some decrease in Sept and Oct in 2024, not as much as BC, so there may be other factors for the decrease other than offline purchases. 
 
 ```{r JJ, warning=F, fig.width=14}
-JJR_2024 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2024", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2024-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
-JJR_2023 <- read.csv("../Clover/Sales240813-241230/JJR-orders-20230909-20231224.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2023", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% filter(Date < "2023-12-25") %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State != "")
+JJR_2023 <- read.csv("../Analysis/SO/JJ-orders-20230101-20231231.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2023", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State %in% c("BC", "AB", "ON", "QC", "US"))
+JJR_2024 <- read.csv("../Analysis/SO/JJ-orders-20240101-20241231.csv", as.is = T) %>%  distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Year = "2024", Country = Country.Code..Shipping., State = ifelse(Country == "US", "US", State.Code..Shipping.)) %>% group_by(Year, Month, Country, State) %>% summarise(No.of.Orders = n(), Amount = sum(Order.Total.Amount....Refund.)) %>% filter(Country != "", State %in% c("BC", "AB", "ON", "QC", "US"))
 JJR_23_24 <- rbind(JJR_2023, JJR_2024) %>% data.table::melt(id.vars = c("Year", "Month", "Country", "State"))
-(JJR_23_24_CA <- ggplot(JJR_23_24, aes(factor(Month, levels = c("Sep", "Oct", "Nov", "Dec")), value, fill = Year)) + 
+(JJR_23_24_CA <- ggplot(JJR_23_24, aes(factor(Month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")), value, fill = Year)) + 
     geom_bar(position = position_dodge(), stat = "identity") + 
     facet_grid(variable ~ State, scales = "free") + 
-    xlab("") + ylab("") + ggtitle("Website sales changes in Sept-Dec 2024") + 
-    theme_bw())
+    xlab("") + ylab("") + ggtitle("Website sales 2023 vs 2024") + 
+    theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1)))
+JJR_2023_BC <- JJR_2023 %>% filter(State == "BC")
+JJR_2024_BC <- JJR_2024 %>% filter(State == "BC")
+Compare <- data.frame(Name = c("2023 Website", "2024 Showroom Total", "2024 Showroom-WarehouseSale", "2024 Website", "2024 Website + 2024 Showroom Total", "2024 Website + 2024 Showroom-WarehouseSale"), Amount = c(sum(JJR_2023_BC$Amount), 491036.9, 218821.4, sum(JJR_2024_BC$Amount), sum(JJR_2024_BC$Amount) + 491036.9, sum(JJR_2024_BC$Amount) + 218821.4), No.of.Orders = c(sum(JJR_2023_BC$No.of.Orders), 4619, 2264, sum(JJR_2024_BC$No.of.Orders), sum(JJR_2024_BC$No.of.Orders) + 4619, sum(JJR_2024_BC$No.of.Orders) + 2264)) %>% data.table::melt(id.vars = "Name")
+(Compare_figure <- ggplot(Compare, aes(Name, value)) + 
+    geom_bar(position = "identity", stat = "identity") + 
+    facet_grid(variable ~ ., scales = "free") + 
+    xlab("") + ylab("") + ggtitle("Website BC and showroom sales in 2023 and 2024") + 
+    theme_bw() + theme(axis.text.x = element_text(angle = 15, hjust = 1)))
 ```
 
 ### Sales by month
