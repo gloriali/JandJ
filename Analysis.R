@@ -647,14 +647,15 @@ discrepancy <- end_inventory %>% select(Name, Quantity) %>% mutate(start = start
 discrepancy[is.na(discrepancy)] <- 0
 discrepancy <- discrepancy %>% mutate(discrepancy = Quantity - (start + TO_in -TO_out - SO)) %>% arrange(desc(abs(discrepancy))) %>% filter(discrepancy < -3 | discrepancy > 5)
 
-# ----------- AMZ BTB returns FW24 -------------
-AMZ_CA_return1 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-241001-241130.tsv", sep = "\t", as.is = T, header = T)
-AMZ_CA_return2 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-241201-250131.tsv", sep = "\t", as.is = T, header = T)
-AMZ_CA_return3 <- read.table("../Analysis/BTBreturns/AMZ-CA-return-report-250201-250326.tsv", sep = "\t", as.is = T, header = T)
-AMZ_CA_return <- rbind(AMZ_CA_return1, rbind(AMZ_CA_return2, AMZ_CA_return3)) %>% filter(grepl("BTB", Merchant.SKU)) %>% select(Order.ID, Label.cost, Currency.code, Merchant.SKU, Return.quantity, Order.amount, Order.quantity, Refunded.amount)
-AMZ_US_return1 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-241001-241130.tsv", sep = "\t", as.is = T, header = T)
-AMZ_US_return2 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-241201-250131.tsv", sep = "\t", as.is = T, header = T)
-AMZ_US_return3 <- read.table("../Analysis/BTBreturns/AMZ-US-return-report-250201-250326.tsv", sep = "\t", as.is = T, header = T)
-AMZ_US_return <- rbind(AMZ_US_return1, rbind(AMZ_US_return2, AMZ_US_return3)) %>% filter(grepl("BTB", Merchant.SKU)) %>% select(Order.ID, Label.cost, Currency.code, Merchant.SKU, Return.quantity, Order.amount, Order.quantity, Refunded.amount)
-AMZ_return <- rbind(AMZ_CA_return, AMZ_US_return) %>% mutate(Refunded.amount = ifelse(is.na(Refunded.amount), Order.amount*Return.quantity/Order.quantity, Refunded.amount))
-write.csv(AMZ_return, file = "../Analysis/BTBreturns/AMZ_return_BTB.csv", row.names = F)
+# ----------- AMZ returns -------------
+AMZ_CA <- read.csv("../Analysis/SO/AMZ_CA_2024Jan1-2024Dec31CustomUnifiedTransaction.csv", as.is = T, skip = 7) %>% mutate(Category = gsub("-.*", "", sku)) %>% 
+  mutate(State = toupper(order.state), State = gsub("TORONTO", "ON", State), State = gsub("QCÉBEC", "QC", State), State = gsub("QCEBEC", "QC", State), State = gsub("QU", "QC", State), State = gsub("COLOMBIE-BRITANNIQCE", "BC", State), State = gsub("NEWFOUNDLAND AND LABRADOR", "NL", State), State = gsub("CANADA / QUEBEC", "QC", State), State = gsub("NORTHWEST TERRITORIES", "NT", State), State = gsub("NOUVEAU-BRUNSWICK", "NB", State), State = gsub("NUNAVUT", "NU", State), State = gsub("YUKON", "YT", State), State = gsub("PRINCE EDWARD ISLAND", "PE", State), State = gsub("QUÉBEC", "QC", State), State = gsub("MANITOBA", "MB", State), State = gsub("SASKATCHEWAN", "SK", State), State = gsub("NEW BRUNSWICK", "NB", State), State = gsub("NEWFOUNDLAND", "NL", State), State = gsub("NOVA SCOTIA", "NS", State), State = gsub("ALBERTA", "AB", State), State = gsub("QUEBEC", "QC", State), State = gsub("ONTARIO", "ON", State), State = gsub("BRITISH COLUMBIA", "BC", State)) 
+AMZ_CA$State <- gsub("QCEBEC", "QC", AMZ_CA$State)
+AMZ_CA$State <- gsub("QCÉBEC", "QC", AMZ_CA$State)
+AMZ_CA$State <- gsub("CANADA / QC", "QC", AMZ_CA$State)
+AMZ_CA_return_I <- AMZ_CA %>% filter(type %in% c("Order", "Refund"), grepl("^I", Category), State != "", Category != "ICP", Category != "IHT") %>% group_by(type, State, Category) %>% summarise(Qty = sum(quantity)) %>% 
+  reshape::cast(State + Category ~ type, value = "Qty") %>% mutate(Refund = ifelse(is.na(Refund), 0, Refund), Return_rate = Refund/Order) %>% filter(Order >= 10) %>% select(-Refund) %>% data.table::melt(id.vars = c("State", "Category"))
+(AMZ_CA_return_I_figure <- ggplot(AMZ_CA_return_I, aes(State, value)) + 
+    geom_bar(stat = "identity", position = "identity") + 
+    facet_grid(variable ~ Category, scale = "free") + 
+    theme_bw())
