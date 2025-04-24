@@ -96,15 +96,15 @@ openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.D
 
 # ------------- Sync NS Richmond inventory with Clover: weekly ---------------------------
 clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
-inventory_update <- clover_item %>% mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(toupper(Name) %in% rownames(netsuite_item_R), Quantity - netsuite_item_R[toupper(Name), "Warehouse.On.Hand"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
-  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
+inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(toupper(Name) %in% rownames(netsuite_item_R), Quantity - netsuite_item_R[toupper(Name), "Warehouse.On.Hand"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
+  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, Status, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 ## if there are unsuccessful Clover SO upload due to NS qty=0 
 SO_error <- read.csv("../NetSuite/results.csv", as.is = T) %>% group_by(Item.SKU) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Item.SKU"]))
 clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
-inventory_update <- clover_item %>% mutate(STATUS = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(toupper(Name) %in% rownames(netsuite_item_R), Quantity - netsuite_item_R[toupper(Name), "Warehouse.On.Hand"], Quantity), ADJUST.QTY.BY = ifelse(ITEM %in% rownames(SO_error), ADJUST.QTY.BY + SO_error[ITEM, "Qty"], ADJUST.QTY.BY), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
-  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, STATUS, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
+inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(toupper(Name) %in% rownames(netsuite_item_R), Quantity - netsuite_item_R[toupper(Name), "Warehouse.On.Hand"], Quantity), ADJUST.QTY.BY = ifelse(ITEM %in% rownames(SO_error), ADJUST.QTY.BY + SO_error[ITEM, "Qty"], ADJUST.QTY.BY), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
+  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, Status, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IAR-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 
@@ -134,6 +134,7 @@ netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("It
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(toupper(.[, "Name"])) 
 season <- "25S"
+request <- c("WSS", "WSF", "WJT", "WJA", "WPS", "WPF", "WBS", "WBF", "BTL", "BRC", "SWS")
 #request <- c("SWS", "BSW", "BSA", "BRC", "BSL", "BTB", "BTL", "BTT", "BST", "WJA", "WJT", "WPF", "WPS", "WBF", "WBS", "WGS", "WMT", "WSF", "WSS", "XBK", "XBM", "XLB", "XPC", "SKG", "SKB", "SKX", "IHT", "FHA", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "FAN", "FJM", "FPM", "DRC", "KEH", "KMT", "LBT", "LBP") # categories to restock for FW
 request <- c("XBM", "XBK", "WJT", "WPS", "WSS", "SWS", "SMF", "BRC", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HLC", "HLH", "GUA", "GUX", "GHA", "GBX", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST") # categories to restock for SS
 n <- 3       # Qty per SKU to stock at Richmond
