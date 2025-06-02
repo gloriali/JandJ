@@ -59,6 +59,11 @@ netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"]) 
 netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND") %>% `row.names<-`(.[, "Name"]) 
 
+#netsuite_item_R <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_R_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% `row.names<-`(.[, "Name"]) 
+#netsuite_item_R[netsuite_item_R == "" | is.na(netsuite_item_R)] <- 0
+#netsuite_item_S <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_S_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% `row.names<-`(.[, "Name"]) 
+#netsuite_item_S[netsuite_item_S == "" | is.na(netsuite_item_S)] <- 0
+
 # -------- Sync XHS price to woo; inventory to NS S: weekly ----------------
 # input: AllValue > Products > Export > All products
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
@@ -182,7 +187,7 @@ for(sheet in sheets){
   inventory <- rbind(inventory, inventory_i)
 }
 inventory[is.na(inventory)] <- 0
-inventory <- inventory %>% mutate(Inv_Total_End.WK = `Inv_Total_End.WK.(Not.Inc..CN.RM)` + Inv_WH.China + Inv_WH.Richmond)
+#inventory <- inventory %>% mutate(Inv_Total_End.WK = `Inv_Total_End.WK.(Not.Inc..CN.RM)` + Inv_WH.China + Inv_WH.Richmond)
 write.csv(inventory, file = paste0("../Analysis/Sales_Inventory_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
 names <- c(Category = "Cat_SKU", Month01="Jan", Month02="Feb", Month03="Mar", Month04="Apr", Month05="May", Month06="June", Month07="July", Month08="Aug", Month09="Sep", Month10="Oct", Month11="Nov", Month12="Dec")
 sheets <- grep("-SKU$", getSheetNames(RawData), value = T)
@@ -229,7 +234,7 @@ write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".cs
 discount_method <- openxlsx::read.xlsx("../Analysis/JJ_discount_method.xlsx", sheet = 1, startRow = 2, rowNames = T)
 if(month == "01"){last3m <- c("Month11", "Month12", "Month01")}else if(month %in% c("02", "03")){last3m <- sprintf("Month%02d", c(1:(as.numeric(month)-1), (as.numeric(month)-3+12):12))}else{last3m <- sprintf("Month%02d", c((as.numeric(month)-3):(as.numeric(month)-1)))}
 monR <- monR %>% mutate(T.last3m = rowSums(across(all_of(last3m)))) %>% `row.names<-`(.[, "Category"])
-inventory_SPU <- inventory %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU)) %>% group_by(SPU) %>% summarise(qty_SPU = sum(Inv_Total_End.WK, na.rm = T), qty_WH = sum(Inv_WH.JJ, na.rm = T), qty_AMZ = qty_SPU - qty_WH) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
+inventory_SPU <- inventory %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU)) %>% group_by(SPU) %>% summarise(qty_SPU = sum(Inv_Total_End.WK, na.rm = T), qty_WH = sum(Inv_WH.Surrey, na.rm = T), qty_AMZ = qty_SPU - qty_WH) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
 sales_SKU_last12month <- sales_SKU_last12month %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU), T.last3m = rowSums(across(all_of(last3m))), T.yr = rowSums(across(Month01:Month12)))
 sales_SPU_last3month <- sales_SKU_last12month %>% group_by(SPU) %>% summarise(T.last3m = sum(T.last3m)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
 sales_SPU_last3month_JJ <- sales_SKU_last12month %>% filter(Sales.Channel == "janandjul.com") %>% group_by(SPU) %>% summarise(T.last3m = sum(T.last3m)) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
@@ -360,7 +365,7 @@ write.csv(JJ_orders_propotion, file = paste0("../woo/JJ_orders_propotion_", Sys.
 
 # ------------ upload regular POs -------------------
 library(stringi)
-season <- "25F"
+season <- "25S"
 folder <- stri_remove_empty(gsub(" *- *sent", "", gsub(paste0("\\.\\.\\/PO\\/order\\/", season, "\\/"), "", list.files(path = paste0("../PO/order/", season, "/"), pattern = "^P"))))
 SeasonStart <- read.csv("../PO/SeasonStart.csv", as.is = T) %>% mutate(receive_date = format(as.Date(paste0(arrival_date, "-2025"), format = "%d-%B-%Y"), "%m/%d/%Y")) %>% `row.names<-`(.[, "category"]) 
 PO_NS <- data.frame(); total <- 0; items <- 0
@@ -419,6 +424,38 @@ for(f in folder){
       write_excel_csv(PO_DE_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_DE_", ID, ".csv"), na = "")
     }
   }
+  if(sum(grepl("澳大利亚总数量", colnames(PO))) == 1){
+    PO_AU <- PO %>% select("产品编号", "澳大利亚总数量") %>% filter(grepl("-.*", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_AU %>% distinct(cat))$cat, collapse = " ")
+    if(CAT != category){print(paste0("Category ERROR: ", category, CAT))}
+    if(category %in% SeasonStart$category){ReceiveDate <- SeasonStart[category, "receive_date"]}else{ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("加拿大总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")}
+    PO_AU_NS <- PO_AU %>% mutate(PO.TYPE = "Regular", CATEGORY = category, SEASON = season, REF.NO = paste0(ID, "-AU"), WAREHOUSE = "WH-AMZ : FBA-AU", VENDOR = vendor, CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = round(as.numeric(ifelse(is.na(澳大利亚总数量), 0, 澳大利亚总数量))), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-AU")) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    print(paste("AU", sum(PO_AU_NS$QUANTITY), PO[2, "澳大利亚总数量"]))
+    total <- total + as.numeric(PO[2, "澳大利亚总数量"])
+    items <- items + nrow(PO_AU_NS)
+    if(nrow(PO_AU_NS)){
+      Encoding(PO_AU_NS$MEMO) = "UTF-8"
+      PO_NS <- rbind(PO_NS, PO_AU_NS)
+      write_excel_csv(PO_AU_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_AU_", ID, ".csv"), na = "")
+    }
+  }
+  if(sum(grepl("日本总数量", colnames(PO))) == 1){
+    PO_JP <- PO %>% select("产品编号", "日本总数量") %>% filter(grepl("-.*", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    CAT <- paste((PO_JP %>% distinct(cat))$cat, collapse = " ")
+    if(CAT != category){print(paste0("Category ERROR: ", category, CAT))}
+    if(category %in% SeasonStart$category){ReceiveDate <- SeasonStart[category, "receive_date"]}else{ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("加拿大总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")}
+    PO_JP_NS <- PO_JP %>% mutate(PO.TYPE = "Regular", CATEGORY = category, SEASON = season, REF.NO = paste0(ID, "-JP"), WAREHOUSE = "WH-AMZ : FBA-JP", VENDOR = vendor, CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = round(as.numeric(ifelse(is.na(日本总数量), 0, 日本总数量))), Tax.Code = "CA-Zero", External.ID = paste0(ID, "-JP")) %>% 
+      filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
+    print(paste("JP", sum(PO_JP_NS$QUANTITY), PO[2, "日本总数量"]))
+    total <- total + as.numeric(PO[2, "日本总数量"])
+    items <- items + nrow(PO_JP_NS)
+    if(nrow(PO_JP_NS)){
+      Encoding(PO_JP_NS$MEMO) = "UTF-8"
+      PO_NS <- rbind(PO_NS, PO_JP_NS)
+      write_excel_csv(PO_JP_NS, file = paste0(gsub("(.*\\/).*", "\\1", file), "NS_PO_JP_", ID, ".csv"), na = "")
+    }
+  }
   if(sum(grepl("中国总数量", colnames(PO))) == 1){
     PO_CN <- PO %>% select("产品编号", "中国总数量") %>% filter(grepl("-.*", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_CN %>% distinct(cat))$cat, collapse = " ")
@@ -439,8 +476,8 @@ for(f in folder){
 print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_NS$QUANTITY), total))
 write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_regular_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
-# ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits -------------------
-ID <- "P406"; season <- "25S"; type <- "CA-Clement"; warehouse <- "WH-SURREY"
+# ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits, US-BabiesR -------------------
+ID <- "P488"; season <- "25F"; type <- "US-BabiesR"; warehouse <- "WH-CHINA"
 file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
 PO_NS <- data.frame(); total <- 0; items <- 0; CAT <- c()
 for(f in file){
@@ -478,10 +515,10 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "25F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "25FWCA1"; ShippingDate <- "4/30/2024"; ReceiveDate <- "5/31/2025"
+season <- "25F"; warehouse <- "FBA-DE"; PO_suffix <- "-DE"
+RefNo <- "25FWDE2"; ShippingDate <- "5/27/2024"; ReceiveDate <- "6/30/2025"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
-  mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments - Quantity.Fulfilled.Received, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
+  mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
@@ -528,7 +565,7 @@ if(nrow(OverReceive)){
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000249" # over-receiving PO 
+  p <- "PO#PO000273" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
@@ -538,9 +575,9 @@ write.csv(shipment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", 
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
 ## generate receiving csv file
-id <- "INBSHIP14"
-receiving <- shipment %>% mutate(ID = id, PO = gsub("PO#PO", "PO-", PO), Item = ITEM, Qty = QUANTITY) %>% select(ID, PO, Item, Qty)
-write.csv(receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving.csv"), row.names = F, quote = F, na = "")
+#id <- "INBSHIP14"
+#receiving <- shipment %>% mutate(ID = id, PO = gsub("PO#PO", "PO-", PO), Item = ITEM, Qty = QUANTITY) %>% select(ID, PO, Item, Qty)
+#write.csv(receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving.csv"), row.names = F, quote = F, na = "")
 
 # ------------ inbound shipment for PO TO combined -------------------
 library(tidyr)
