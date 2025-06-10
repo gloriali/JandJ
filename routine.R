@@ -502,7 +502,7 @@ print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_
 write_excel_csv(PO_NS, file = paste0(gsub("(.*\\/).*", "\\1", f), "NS_PO_", ID, ".csv"), na = "")
 
 # ------------ upload CEFA POs -------------------
-ID <- "CEFA6"; season <- "25S"; ReceiveDate <- "4/20/2025"
+ID <- "CEFA7"; season <- "25F"; ReceiveDate <- "10/20/2025"
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
 PO <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../PO/order/CEFA/", pattern = "Order.*.xlsx", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1, startRow = 2) %>% 
   filter(grepl("-.*-", SKU.Number), !is.na(Quantity), Quantity > 0) %>% mutate(cat = gsub("-.*", "", SKU.Number))
@@ -515,8 +515,8 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "25F"; warehouse <- "FBA-DE"; PO_suffix <- "-DE"
-RefNo <- "25FWDE2"; ShippingDate <- "5/27/2024"; ReceiveDate <- "6/30/2025"
+season <- "25F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
+RefNo <- "25FWCA1"; ShippingDate <- "5/13/2025"; ReceiveDate <- "6/10/2025"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -528,10 +528,10 @@ shipment <- data.frame(); attachment <- data.frame(); Nbox <- 0
 for(s in 2:length(sheets)){
   sheet <- sheets[s]
   shipment_i <- openxlsx::read.xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
-    select(1:Season) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down") %>% mutate(`PO.#` = str_trim(`PO.#`))
+    select(1:PER.CTN) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down") %>% mutate(`PO.#` = str_trim(`PO.#`)) 
   if(sum(grepl("CTN.NO", colnames(shipment_i))) == 1){
     print(paste(1, sheet))
-    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$`PO.#`, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = as.numeric(shipment_i$QTY.SHIPPED), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
+    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$`PO.#`, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = as.numeric(shipment_i$QTY.SHIPPED), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]), Unit.Weight = as.numeric(shipment_i$`Unit.Weight(g)`), GR.Weight = round(as.numeric(shipment_i$PER.CTN), 2)) %>% group_by(BOX.NO) %>% mutate(EST.Weight = round(sum(QUANTITY*Unit.Weight/1000) + 1, 2))
   }else{
     print(paste(2, sheet))
     colnames(shipment_i) <- c("Start", "End", colnames(shipment_i)[3:length(colnames(shipment_i))])
@@ -539,15 +539,16 @@ for(s in 2:length(sheets)){
     shipment_o <- data.frame()
     for(i in 1:nrow(shipment_i)){
       for(n in shipment_i[i, "Start"]:shipment_i[i, "End"]){
-        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO.#"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = as.numeric(shipment_i[i, "QTY.Per.Box"]), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"])))
+        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO.#"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = as.numeric(shipment_i[i, "QTY.Per.Box"]), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]), Unit.Weight = as.numeric(shipment_i[i, "Unit.Weight(g)"]), GR.Weight = round(as.numeric(shipment_i[i, "PER.CTN"]), 2)) %>% group_by(BOX.NO) %>% mutate(EST.Weight = round(sum(QUANTITY*Unit.Weight/1000) + 1, 2)))
       }
     }
   }
   Nbox <- Nbox + length(unique(shipment_o$BOX.NO))
   print(paste0("Total Qty ", sum(shipment_o$QUANTITY), "; Total Box# ", length(unique(shipment_o$BOX.NO))))
-  shipment <- rbind(shipment, shipment_o)
-  attachment <- rbind(attachment, data.frame(Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), Notes = ""))
+  shipment <- rbind(shipment, shipment_o %>% select(REF.NO:PO))
+  attachment <- rbind(attachment, data.frame(Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), Unit.Weight = c(shipment_o$Unit.Weight, ""), GR.Weight = c(shipment_o$GR.Weight, ""), EST.Weight = c(shipment_o$EST.Weight, ""), Notes = ""))
 }
+print(paste0("Qty: ", sum(shipment$QUANTITY), "; #Boxes: ", Nbox))
 if(sum(shipment$QUANTITY) == summary[nrow(summary), "QTY"]){print(paste0("Total QTY matches: ", sum(shipment$QUANTITY)))}else{print(paste("Total QTY NOT matching:", sum(shipment$QUANTITY), summary[nrow(summary), "QTY"]))}
 if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
 # check for over-receiving
@@ -565,7 +566,7 @@ if(nrow(OverReceive)){
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000273" # over-receiving PO 
+  p <- "PO#PO000274" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
@@ -673,3 +674,10 @@ TO_receiving <- data.frame(TO = "TO000117", Internal.ID = "243637", Item = TO$IT
 TO_receiving <- TO_receiving %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(TO_receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_TO_receiving.csv"), row.names = F, quote = F, na = "")
 
+# ------------ check shipment Qty -------------------
+RefNo <- "25FWCA1"
+attachment <- read.csv(list.files(path = "../PO/shipment/", pattern = paste0(RefNo, "_receiving_by_box.csv"), recursive = T, full.names = T), as.is = T) %>% distinct(SKU, .keep_all = T) %>% `row.names<-`(.[, "SKU"])
+shipment_weight <- openxlsx::read.xlsx(list.files(path = "../PO/shipment/", pattern = paste0("WeightData-", RefNo, ".xlsx"), recursive = T, full.names = T)) %>% 
+  mutate(Total.Weight = `Total.Weight.(g)`/1000, Unit.Weight = attachment[SKU, "Unit.Weight"]) %>% group_by(`BOX.#`) %>% mutate(EST.Weight = sum(Packing.Slip.QTY * Unit.Weight/1000) + 1)
+discrepancy <- shipment_weight %>% filter(abs(EST.Weight - Total.Weight) > 5*Unit.Weight/1000) %>% mutate(Diff = EST.Weight - Total.Weight)
+write.csv(discrepancy, file = paste0("../PO/shipment/Weight_discrepancy_", RefNo, ".csv"), row.names = F, quote = F)
