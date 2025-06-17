@@ -659,3 +659,13 @@ AMZ_CA_return_I <- AMZ_CA %>% filter(type %in% c("Order", "Refund"), grepl("^I",
     geom_bar(stat = "identity", position = "identity") + 
     facet_grid(variable ~ Category, scale = "free") + 
     theme_bw())
+
+# ----------- PO for leftover fabric -------------
+fabric <- openxlsx::read.xlsx("../PO/LeftoverFabricFW-2025-6-10.xlsx", sheet = 1) %>% `row.names<-`(.[, "Print"])
+netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% group_by(Item.Category.SKU, Item.Print.SKU) %>% summarise(Qty = sum(Warehouse.Available)) %>% as.data.frame() %>% `row.names<-`(paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]))
+mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% distinct(Category.SKU, Print.SKU, .keep_all = T) %>% select(Print.SKU, Category.SKU, Seasons)
+fabricA <- mastersku %>% filter(Print.SKU %in% fabric$Print) %>% mutate(Print.Chinese = fabric[Print.SKU, "颜色/花型"], Length = fabric[Print.SKU, "Length"], Qty = netsuite_item_S[paste0(Category.SKU, "-", Print.SKU), "Qty"]) %>% arrange(Print.SKU) %>% filter(!grepl("^H", Category.SKU))
+write.xlsx(fabricA, file = "../PO/LeftoverFabricFW1-2025-6-10.xlsx")
+fabric <- openxlsx::read.xlsx("../PO/LeftoverFabricFW2-2025-6-10.xlsx", sheet = 1) 
