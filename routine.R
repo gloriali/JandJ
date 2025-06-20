@@ -685,9 +685,13 @@ TO_receiving <- TO_receiving %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(TO_receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_TO_receiving.csv"), row.names = F, quote = F, na = "")
 
 # ------------ check shipment Qty -------------------
-RefNo <- "25FWCA1"
-attachment <- read.csv(list.files(path = "../PO/shipment/", pattern = paste0(RefNo, "_receiving_by_box.csv"), recursive = T, full.names = T), as.is = T) %>% distinct(SKU, .keep_all = T) %>% `row.names<-`(.[, "SKU"])
-shipment_weight <- openxlsx::read.xlsx(list.files(path = "../PO/shipment/", pattern = paste0("WeightData-", RefNo, ".xlsx"), recursive = T, full.names = T)) %>% 
-  mutate(Total.Weight = `Total.Weight.(g)`/1000, Unit.Weight = attachment[SKU, "Unit.Weight"]) %>% group_by(`BOX.#`) %>% mutate(EST.Weight = sum(Packing.Slip.QTY * Unit.Weight/1000) + 1)
-discrepancy <- shipment_weight %>% filter(abs(EST.Weight - Total.Weight) > 5*Unit.Weight/1000) %>% mutate(Diff = EST.Weight - Total.Weight)
+RefNo <- "25FWCA5"
+attachment <- read.csv(list.files(path = "../PO/shipment/", pattern = paste0(RefNo, "_receiving_by_box.csv"), recursive = T, full.names = T), as.is = T) %>% filter(SKU!="") %>% `row.names<-`(paste0(.[, "SKU"], "_", .[, "Box.Number"]))
+shipment_weight <- openxlsx::read.xlsx(list.files(path = "../PO/shipment/", pattern = paste0("BoxWeight_", RefNo, ".xlsx"), recursive = T, full.names = T)) %>% 
+  mutate(Total.Weight = `Total.Weight.(g)`/1000, Unit.Weight.woo = attachment[paste0(SKU, "_", Box.Number), "Unit.Weight.woo"], Unit.Weight.Shipment = attachment[paste0(SKU, "_", Box.Number), "Unit.Weight.Shipment"], EST.Weight.woo = attachment[paste0(SKU, "_", Box.Number), "EST.Weight.woo"], EST.Weight.Shipment = attachment[paste0(SKU, "_", Box.Number), "EST.Weight.Shipment"], Diff.woo = Total.Weight - EST.Weight.woo, Diff.Shipment = Total.Weight - EST.Weight.Shipment)
+discrepancy <- shipment_weight %>% filter(abs(Diff.woo) > Unit.Weight.woo/1000 & abs(Diff.Shipment) > Unit.Weight.Shipment/1000)
+View(discrepancy)
+discrepancy_size <- discrepancy %>% mutate(Category = gsub("-.*", "", SKU), Size = gsub(".*-", "", SKU)) %>% group_by(Category, Size) %>% summarise(N = n(), Diff.woo = mean(Diff.woo), Diff.Shipment = mean(Diff.Shipment))
+View(discrepancy_size)
 write.csv(discrepancy, file = paste0("../PO/shipment/Weight_discrepancy_", RefNo, ".csv"), row.names = F, quote = F)
+write.csv(discrepancy_size, file = paste0("../PO/shipment/Weight_discrepancy_size_", RefNo, ".csv"), row.names = F, quote = F)
