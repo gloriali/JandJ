@@ -45,7 +45,7 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.
 ### -------- create new listing ------------------------
 new_season <- "25"
 mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-")) %>% `row.names<-`(toupper(.[, "MSKU"]))
-catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU- product category", fillMergedCells = T) %>% filter(!duplicated(SKU)) %>% `row.names<-`(.[, "SKU"])
+catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU- product category", fillMergedCells = T) %>% filter(!duplicated(Category_SKU)) %>% `row.names<-`(.[, "Category_SKU"])
 image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T) %>% `row.names<-`(.[, "SKU"])
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
@@ -60,7 +60,7 @@ categories_exclude <- c("Fall_Legging", "SSW", "SSS", "SKT", "SKB-INSOL", "MWPS"
 item_new <- netsuite_item_S %>% filter(!(Name %in% products_XHS$SKU), Warehouse.Available > 20, !(Item.Category.SKU %in% categories_exclude))
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
-products_description_cat <- rbind(products_description_cat, data.frame(cat = unique(item_new$Item.Category.SKU)[!(unique(item_new$Item.Category.SKU) %in% products_description_cat$cat)]) %>% mutate(Product.Name = catprint[cat, "Style.Name"], Description = "", Categories = catprint[cat, "Product.Category"], Option1.Name = "Size"))
+products_description_cat <- rbind(products_description_cat, data.frame(cat = unique(item_new$Item.Category.SKU)[!(unique(item_new$Item.Category.SKU) %in% products_description_cat$cat)]) %>% mutate(Product.Name = catprint[cat, "Chinese_Name"], Description = "", Categories = catprint[cat, "Parent_Category.(Chinese)"], Option1.Name = "Size"))
 write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", row.names = F)
 # !open products_description_cat in excel and fill in info
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
