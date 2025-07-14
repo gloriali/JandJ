@@ -669,3 +669,25 @@ mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/"
 fabricA <- mastersku %>% filter(Print.SKU %in% fabric$Print) %>% mutate(Print.Chinese = fabric[Print.SKU, "颜色/花型"], Length = fabric[Print.SKU, "Length"], Qty = netsuite_item_S[paste0(Category.SKU, "-", Print.SKU), "Qty"]) %>% arrange(Print.SKU) %>% filter(!grepl("^H", Category.SKU))
 write.xlsx(fabricA, file = "../PO/LeftoverFabricFW1-2025-6-10.xlsx")
 fabric <- openxlsx::read.xlsx("../PO/LeftoverFabricFW2-2025-6-10.xlsx", sheet = 1) 
+
+# ----------- warehouse sale 2025 ---------------
+netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"])
+items <- openxlsx::read.xlsx("../Analysis/WarehouseSale_20250623.xlsx", sheet = 1) %>% mutate(Warehouse.Available = netsuite_item_S[Name, "Warehouse.Available"])
+openxlsx::write.xlsx(items, file = "../Analysis/WarehouseSale_20250708.xlsx")
+items_left <- netsuite_item_S %>% filter(Warehouse.Available > 0, !(Name %in% items$Name))
+openxlsx::write.xlsx(items_left, file = "../Analysis/WarehouseSale_20250708-1.xlsx")
+# setup Clover
+sales <- openxlsx::read.xlsx("../Analysis/WarehouseSale_20250708.xlsx", sheet = 1)
+clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(Name != "") %>% 
+  mutate(Price = ifelse(Name %in% sales$Name, sales[Name, "Price"], Price), Quantity = ifelse(Name %in% netsuite_item_S$Name, netsuite_item_S[Name, "Warehouse.Available"], 0))
+clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^SS", Name), 10, Price))
+clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^SWS", Name), 50, Price))
+clover_item <- clover_item %>% mutate(Price.Type = ifelse(is.na(Price), "Variable", "Fixed"))
+clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
+deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
+writeData(clover, sheet = "Items", clover_item)
+openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+
