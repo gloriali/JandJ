@@ -696,6 +696,7 @@ clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^FPM", Name), 15, Pr
 clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^XBM", Name), 28, Price))
 clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^WSF", Name), 65, Price))
 clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^WSS", Name), 50, Price))
+clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^HJS", Name), 10, Price))
 clover_item <- clover_item %>% mutate(Price.Type = ifelse(is.na(Price), "Variable", "Fixed"))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
