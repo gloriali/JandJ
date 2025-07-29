@@ -661,14 +661,16 @@ AMZ_CA_return_I <- AMZ_CA %>% filter(type %in% c("Order", "Refund"), grepl("^I",
     theme_bw())
 
 # ----------- PO for leftover fabric -------------
-fabric <- openxlsx::read.xlsx("../PO/LeftoverFabricFW-2025-6-10.xlsx", sheet = 1) %>% `row.names<-`(.[, "Print"])
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
-netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% group_by(Item.Category.SKU, Item.Print.SKU) %>% summarise(Qty = sum(Warehouse.Available)) %>% as.data.frame() %>% `row.names<-`(paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]))
-mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% distinct(Category.SKU, Print.SKU, .keep_all = T) %>% select(Print.SKU, Category.SKU, Seasons)
-fabricA <- mastersku %>% filter(Print.SKU %in% fabric$Print) %>% mutate(Print.Chinese = fabric[Print.SKU, "颜色/花型"], Length = fabric[Print.SKU, "Length"], Qty = netsuite_item_S[paste0(Category.SKU, "-", Print.SKU), "Qty"]) %>% arrange(Print.SKU) %>% filter(!grepl("^H", Category.SKU))
-write.xlsx(fabricA, file = "../PO/LeftoverFabricFW1-2025-6-10.xlsx")
-fabric <- openxlsx::read.xlsx("../PO/LeftoverFabricFW2-2025-6-10.xlsx", sheet = 1) 
+netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"])
+mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% distinct(MSKU, .keep_all = T) %>% select(MSKU, Print.SKU, Print.Name, Print.Chinese, Category.SKU, Seasons, MSKU.Status) %>% `row.names<-`(.[, "MSKU"])
+usage <- openxlsx::read.xlsx("../PO/单耗统计表 - 2025-6-14.xlsx", sheet = 1) %>% mutate(Category = gsub("-.*", "", SKU)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "尺码"]))
+fabric <- openxlsx::read.xlsx("../PO/order/LeftoverFabric2025.xlsx", sheet = 3) %>% `row.names<-`(paste0(.[, "Category"], "-", .[, "Print"]))
+PO <- netsuite_item_S %>% filter(paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]) %in% rownames(fabric)) %>% mutate(Fabric = fabric[paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]), "Length"], Cost = usage[paste0(.[, "Item.Category.SKU"], "_", .[, "Item.Size"]), "单耗（米）"], SizeR = usage[paste0(.[, "Item.Category.SKU"], "_", .[, "Item.Size"]), "SizeR"], Status = mastersku[Name, "MSKU.Status"], Print.Name = mastersku[Name, "Print.Name"], Print.Chinese = mastersku[Name, "Print.Chinese"]) %>%
+  select(Name, Item.Category.SKU, Item.Print.SKU, Print.Name, Print.Chinese, Item.Size, Item.SKU.Seasons, Status, Fabric, Cost, SizeR, Warehouse.Available) %>% filter(!(Item.Size %in% c("6m", "10Y"))) %>%
+  mutate(CostXsizeR = Cost*SizeR) %>% group_by(Item.Category.SKU, Item.Print.SKU) %>% mutate(T.CostXsizeR = sum(CostXsizeR), Quantity = round(Fabric*SizeR/T.CostXsizeR, 0), check = sum(Cost * Quantity))
+openxlsx::write.xlsx(PO, file = "../PO/order/PO_leftoverFabric_Sunhats_20250729.xlsx")
 
 # ----------- warehouse sale 2025 --------------- 
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
