@@ -670,7 +670,7 @@ fabric <- openxlsx::read.xlsx("../PO/order/LeftoverFabric2025.xlsx", sheet = 3) 
 PO <- netsuite_item_S %>% filter(paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]) %in% rownames(fabric)) %>% mutate(Fabric = fabric[paste0(.[, "Item.Category.SKU"], "-", .[, "Item.Print.SKU"]), "Length"], Cost = usage[paste0(.[, "Item.Category.SKU"], "_", .[, "Item.Size"]), "单耗（米）"], SizeR = usage[paste0(.[, "Item.Category.SKU"], "_", .[, "Item.Size"]), "SizeR"], Status = mastersku[Name, "MSKU.Status"], Print.Name = mastersku[Name, "Print.Name"], Print.Chinese = mastersku[Name, "Print.Chinese"]) %>%
   select(Name, Item.Category.SKU, Item.Print.SKU, Print.Name, Print.Chinese, Item.Size, Item.SKU.Seasons, Status, Fabric, Cost, SizeR, Warehouse.Available) %>% filter(!(Item.Size %in% c("6m", "10Y"))) %>%
   mutate(CostXsizeR = Cost*SizeR) %>% group_by(Item.Category.SKU, Item.Print.SKU) %>% mutate(T.CostXsizeR = sum(CostXsizeR), Quantity = round(Fabric*SizeR/T.CostXsizeR, 0), check = sum(Cost * Quantity))
-openxlsx::write.xlsx(PO, file = "../PO/order/PO_leftoverFabric_Sunhats_20250729.xlsx")
+openxlsx::write.xlsx(PO, file = paste0("../PO/order/PO_leftoverFabric_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
 
 # ----------- warehouse sale 2025 --------------- 
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
