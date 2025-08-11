@@ -45,7 +45,7 @@ write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.
 ### -------- create new listing ------------------------
 new_season <- "25"
 mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-")) %>% `row.names<-`(toupper(.[, "MSKU"]))
-catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU- product category", fillMergedCells = T) %>% filter(!duplicated(Category_SKU)) %>% `row.names<-`(.[, "Category_SKU"])
+catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU - product category", fillMergedCells = T) %>% filter(!duplicated(Category_SKU)) %>% `row.names<-`(.[, "Category_SKU"])
 image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T) %>% `row.names<-`(.[, "SKU"])
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
