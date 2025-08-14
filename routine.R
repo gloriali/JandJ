@@ -104,19 +104,22 @@ write.csv(inventory_update, file = paste0("../NetSuite/IAR-", format(Sys.Date(),
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"])
-season <- "25S"
+season <- "25F"
 #request <- c("WSS", "WSF", "WJT", "WJA", "WPS", "WPF", "WBS", "WBF", "BTL", "BRC", "SWS")
-#request <- c("SWS", "BSW", "BSA", "BRC", "BSL", "BTB", "BTL", "BTT", "BST", "WJA", "WJT", "WPF", "WPS", "WBF", "WBS", "WGS", "WMT", "WSF", "WSS", "XBK", "XBM", "XLB", "XPC", "SKG", "SKB", "SKX", "IHT", "FHA", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "FAN", "FJM", "FPM", "DRC", "KEH", "KMT", "LBT", "LBP") # categories to restock for FW
-request <- c("FMR", "BSA", "KHB", "KHP", "KMN", "FHA", "WJA", "BCV", "WSS", "BTT", "BST", "FJM", "FPM", "FSM", "FJC", "LAB", "LAN", "LBT", "LBP", "LCP", "LCT", "WPO", "WPF", "WJT", "WPS", "WSS", "SWS", "SMC", "SBS", "SMF", "XBM", "XBK", "BRC", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HLC", "HLH", "GUA", "GUX", "GHA", "GBX", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST") # categories to restock for SS
+request <- c("AJA", "AJC", "AJM", "BSW", "BSA", "BRC", "BST", "BSL", "BTB", "BTL", "BTT", "BST", "FAN", "FHA", "FJC", "FJM", "FPM", "FMR", "FSM", "FVM", "IHT", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "KEH", "KHB", "KHM", "KHP", "KMN", "KMT", "LAB", "LAN", "LBT", "LBP", "LCP", "LCT", "SKG", "SKB", "SKX", "SMC", "SMF", "SWS", "WJA", "WJT", "WPF", "WPS", "WBF", "WJO", "WPO", "WHO", "WHR", "WBS", "WGF", "WGS", "WMT", "WRM", "WSF", "WSS", "XBK", "XBM", "XLB", "XPC") # categories to restock for FW
+#request <- c("SWS", "SMC", "SBS", "SMF", "XBM", "XBK", "BRC", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HLC", "HLH", "GUA", "GUX", "GHA", "GBX", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST") # categories to restock for SS
+cat <- c("WJA", "WPF", "LCT", "LCP", "XBK", "XBM", "XLB", "SWS", "BRC")
+size <- c("2T", "3T", "4T", "5T", "OS", "26", "27", "28")
 n <- 3       # Qty per SKU to stock at Richmond
+n1 <- 5   # Qty for SKUs in cat & size to refill
 n_S <- 8 # min Qty in stock at Surrey to request
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(.[, "Name"])
 # order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
 # order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 order <- data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = season, FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Richmond Refill", ORDER.PLACED.BY = "Gloria Li", ITEM = (clover_item %>% filter(Quantity < n))$Name) %>% 
-  mutate(Quantity = n - clover_item[ITEM, "Quantity"]) %>% filter(ITEM %in% netsuite_item_S$Name, netsuite_item_S[ITEM, "Warehouse.Available"] > n_S) %>% filter(Quantity > 1) %>% mutate(cat = gsub("-.*", "", ITEM), size = gsub("\\w+-\\w+-", "", ITEM))
-order <- order %>% filter(cat %in% request)
+  mutate(CAT = netsuite_item_S[ITEM, "Item.Category.SKU"], SIZE = netsuite_item_S[ITEM, "Item.Size"], Seasons = netsuite_item_S[ITEM, "Item.SKU.Seasons"], Quantity = ifelse(CAT %in% cat & SIZE %in% size & grepl(season, Seasons), n1 - clover_item[ITEM, "Quantity"], n - clover_item[ITEM, "Quantity"])) %>% filter(ITEM %in% netsuite_item_S$Name, netsuite_item_S[ITEM, "Warehouse.Available"] > n_S) %>% filter(Quantity > 1) %>% mutate(cat = gsub("-.*", "", ITEM), size = gsub("\\w+-\\w+-", "", ITEM))
+order <- order %>% filter(cat %in% request) %>% select(-CAT, -SIZE, -Seasons)
 order <- order %>% rename_with(~ gsub("\\.", " ", colnames(order))) %>% select(-c("cat", "size")) %>% arrange(ITEM)
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 # upload to NS & email Shikshit
@@ -125,9 +128,9 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "item-sales-summary-2025-07-14-2025-07-19.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08112025.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity - adjust_inventory[SKU, "Quantity"], Quantity))
+clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
 writeData(clover, sheet = "Items", clover_item)
