@@ -128,7 +128,7 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08112025.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08152025.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
 clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
