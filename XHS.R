@@ -16,7 +16,7 @@ products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetInde
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
 openxlsx::protectWorkbook(wb, protect = F)
 openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
-products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
+products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1) %>% filter(Status == "Listed")
 
 ### -------------- Sync XHS price to woo; inventory to NS S ---------------
 # input: AllValue > Products > Export > All products
@@ -56,18 +56,18 @@ products_XHS[products_XHS=="NA"] <- ""
 
 #### description and details for the new listing
 ##### Add a new category
-categories_exclude <- c("Fall_Legging", "SSW", "SSS", "SKT", "SKB-INSOL", "MWPS", "MWPF", "MSXP", "MSKB", "MKMT", "DEAL-MISC-KCS", "GUB-BOX", "GUB-AST", "FMG", "FVMU", "AWP", "AAP")
+categories_exclude <- c("Fall_Legging", "SSW", "SSS", "SKT", "SKB-INSOL", "MWPS", "MWPF", "MSXP", "MSKB", "MKMT", "DEAL-MISC-KCS", "GUB-BOX", "GUB-AST", "FMG", "FVMU", "AWP", "AAP", "TICKET")
 item_new <- netsuite_item_S %>% filter(!(Name %in% products_XHS$SKU), Warehouse.Available > 20, !(Item.Category.SKU %in% categories_exclude))
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
 products_description_cat <- rbind(products_description_cat, data.frame(cat = unique(item_new$Item.Category.SKU)[!(unique(item_new$Item.Category.SKU) %in% products_description_cat$cat)]) %>% mutate(Product.Name = catprint[cat, "Chinese_Name"], Description = "", Categories = catprint[cat, "Parent_Category.(Chinese)"], Option1.Name = "Size"))
-write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", row.names = F)
+openxlsx::write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", rowNames = F)
 # !open products_description_cat in excel and fill in info
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
 new_description <- data.frame(SPU = paste0(item_new$Item.Category.SKU, "-", item_new$Item.Print.SKU), cat = item_new$Item.Category.SKU, Seasons = item_new$Item.SKU.Seasons) %>% mutate(Product.Name = paste0(products_description_cat[cat, "Product.Name"], " | ", mastersku[item_new$Name, "Print.Chinese"]), Description = products_description_cat[cat, "Description"], Categories = products_description_cat[cat, "Categories"], Option1.Name = products_description_cat[cat, "Option1.Name"], Image.Src = image[SPU, "Images"]) %>%
   distinct(SPU, .keep_all = T) %>% filter(!(SPU %in% toupper(products_XHS$SPU)), !(SPU %in% products_description$SPU), SPU %in% toupper(gsub("^(\\w+-\\w+)-.*", "\\1", woo$SKU))) %>% `row.names<-`(.[, "SPU"])
 products_description <- rbind(products_description, new_description %>% select(-Seasons))
-write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
+write.xlsx(products_description, file = "../XHS/products_description.xlsx", rowNames = F)
 # !open products_description in excel and fill in missing info
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)  %>% `row.names<-`(.[, "SPU"])
 new_listing <- data.frame(SKU = item_new$Name) %>% 
