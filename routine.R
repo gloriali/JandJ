@@ -69,8 +69,8 @@ HST_states <- c("NS", "ON", "PE")
 GSTonly_states <- c("AB", "NT", "NU", "YT")
 PST_cats <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJP", "AJS", "AWWJ", "DRC", "GBX", "GHA", "GUA", "GUX", "XBK", "XBM", "XLB", "XPC")
 netsuite_so <- XHS_so %>% filter(Financial.Status == "paid", Shipping.Country != "中国") %>% 
-  mutate(Order.Type.Code = paste("JJR", Shipping.Country), Order.ID = paste0("XHS", Shipping.Country, "-", Order.No), Order.Date = format(as.Date(gsub(" .*", "", Created.At), "%Y-%m-%d"), "%m/%d/%Y"), Shipping.Name = ifelse(Delivery.Method == "pickup", Pickup.Person.Name, paste(Shipping.First.Name, Shipping.Last.Name)), Cat = gsub("-.*", "", LineItem.SKU)) %>% 
-  mutate(Customer.ID = ifelse(Order.Type.Code == "JJR CA", "57 XHS CA", "28876 XHS US"), Ref.Number = Order.ID,	Date = format(Sys.Date(), "%m/%d/%Y"), Sales.Effective.Date = Order.Date, Ship.By.Date = format(as.Date(Date, "%m/%d/%Y") + 1, "%m/%d/%Y"),	Price.Level = "Custom",	SKU = LineItem.SKU,	Unit.Price = LineItem.UnitPrice, QTY = LineItem.Quantity, Amount = LineItem.Total - LineItem.Total.Discount, Tax.Code = ifelse(Shipping.Country == "US", ".", ifelse(Shipping.Province %in% GSTonly_states, paste0("CA-", Shipping.Province, "-GST"), ifelse(Shipping.Province %in% HSTonly_states, paste0("CA-", Shipping.Province, "-HST"), ifelse(Shipping.Province %in% HST_states, ifelse(Cat %in% PST_cats, paste0("CA-", Shipping.Province, "-HST"), paste0("CA-", Shipping.Province, "-GST")), ifelse(Cat %in% PST_cats, paste0("CA-", Shipping.Province, "-TAX"), paste0("CA-", Shipping.Province, "-GST")))))), Coupon_Discount = LineItem.Total.Discount, Order.Coupon.Code = LineItem.Promotion.Detail, Shipping.cost = Shipping, Shipping.Tax.Code = ".", Woocommerce.Order.Total = Total, Commit = "Available QTY",	Marketplace.PAYMENT.METHOD = Payment.Method, Payment.Option = ifelse(Payment.Method == "Stripe", "Stripe CAD Retail", "AlphaPay"), Terms = "CIA", To.Be.Emailed = "No", Shipping.Postal.Code = Shipping.Zip, Billing.Name = Shipping.Name, Billing.Address1 = Shipping.Address1, Billing.Address2 = Shipping.Address2, Billing.City = Shipping.City, Billing.Province = Shipping.Province, Billing.Country = Shipping.Country, Billing.Postal.Code = Shipping.Zip, Department = "Retail : Marketplace : XiaoHongShu", Class = paste("FBM :", Shipping.Country),	Warehouse = "WH-SURREY", Recipient = Shipping.Name, Recipient.Email = Email, Recipient.Phone = Phone, Marketplace.Shipping.Method = ifelse(Delivery.Method != "pickup", ifelse(Shipping == 0, "Free shipping over $69", "Parcel with Tracking"), ifelse(Shipping.City == "Vancouver", "Pickup at UBC Vancouver Campus", ifelse(Shipping.City == "Richmond", "Pickup at Office in Richmond, BC", "Pickup at Warehouse in Surrey, BC"))), Shipstation.Carrier = ifelse(Shipping.Country == "CA", "Canada Post", "USPS"),	Shipstation.Shipping.Service = ifelse(Shipping.Country == "CA", "Expedited Parcel", "USPS Priority Mail"), SHIPSTATION.SERVICE = ifelse(Delivery.Method != "pickup", "Standard", ifelse(Shipping.City == "Vancouver", "UBC Pickup", paste(Shipping.City, "Pickup"))), Order.Issue = "", Memo = "XHS order") %>%
+  mutate(Order.Type.Code = paste("XHS", Shipping.Country), Order.ID = paste0("XHS", Shipping.Country, "-", Order.No), Order.Date = format(as.Date(gsub(" .*", "", Created.At), "%Y-%m-%d"), "%m/%d/%Y"), Shipping.Name = ifelse(Delivery.Method == "pickup", Pickup.Person.Name, paste(Shipping.First.Name, Shipping.Last.Name)), Cat = gsub("-.*", "", LineItem.SKU)) %>% 
+  mutate(Customer.ID = ifelse(Order.Type.Code == "JJR CA", "57 XHS CA", "28876 XHS US"), Ref.Number = Order.ID,	Date = format(Sys.Date(), "%m/%d/%Y"), Sales.Effective.Date = Order.Date, Ship.By.Date = format(as.Date(Date, "%m/%d/%Y") + 1, "%m/%d/%Y"),	Price.Level = "Custom",	SKU = LineItem.SKU,	Unit.Price = LineItem.UnitPrice, QTY = LineItem.Quantity, Amount = as.numeric(LineItem.Total) - as.numeric(LineItem.Total.Discount), Tax.Code = ifelse(Shipping.Country == "US", ".", ifelse(Shipping.Province %in% GSTonly_states, paste0("CA-", Shipping.Province, "-GST"), ifelse(Shipping.Province %in% HSTonly_states, paste0("CA-", Shipping.Province, "-HST"), ifelse(Shipping.Province %in% HST_states, ifelse(Cat %in% PST_cats, paste0("CA-", Shipping.Province, "-HST"), paste0("CA-", Shipping.Province, "-GST")), ifelse(Cat %in% PST_cats, paste0("CA-", Shipping.Province, "-TAX"), paste0("CA-", Shipping.Province, "-GST")))))), Coupon_Discount = LineItem.Total.Discount, Order.Coupon.Code = LineItem.Promotion.Detail, Shipping.cost = Shipping, Shipping.Tax.Code = ".", Woocommerce.Order.Total = Total, Commit = "Available QTY",	Marketplace.PAYMENT.METHOD = Payment.Method, Payment.Option = ifelse(Payment.Method == "Stripe", "Stripe CAD Retail", "AlphaPay"), Terms = "CIA", To.Be.Emailed = "No", Shipping.Postal.Code = Shipping.Zip, Billing.Name = Shipping.Name, Billing.Address1 = Shipping.Address1, Billing.Address2 = Shipping.Address2, Billing.City = Shipping.City, Billing.Province = Shipping.Province, Billing.Country = Shipping.Country, Billing.Postal.Code = Shipping.Zip, Department = "Retail : Marketplace : XiaoHongShu", Class = paste("FBM :", Shipping.Country),	Warehouse = "WH-SURREY", Recipient = Shipping.Name, Recipient.Email = Email, Recipient.Phone = Phone, Marketplace.Shipping.Method = ifelse(Delivery.Method != "pickup", ifelse(Shipping == 0, "Free shipping over $69", "Parcel with Tracking"), ifelse(Shipping.City == "Vancouver", "Pickup at UBC Vancouver Campus", ifelse(Shipping.City == "Richmond", "Pickup at Office in Richmond, BC", "Pickup at Warehouse in Surrey, BC"))), Shipstation.Carrier = ifelse(Shipping.Country == "CA", "Canada Post", "USPS"),	Shipstation.Shipping.Service = ifelse(Shipping.Country == "CA", "Expedited Parcel", "USPS Priority Mail"), SHIPSTATION.SERVICE = ifelse(Delivery.Method != "pickup", "Standard", ifelse(Shipping.City == "Vancouver", "UBC Pickup", paste(Shipping.City, "Pickup"))), Order.Issue = "", Memo = "XHS order") %>%
   select(Customer.ID, Order.Type.Code, Order.ID, Ref.Number, Date, Order.Date, Sales.Effective.Date, Ship.By.Date, Price.Level, SKU, Unit.Price, QTY, Amount, Tax.Code, Coupon_Discount, Order.Coupon.Code, Shipping.cost, Shipping.Tax.Code, Woocommerce.Order.Total, Marketplace.Shipping.Method, Commit, Marketplace.PAYMENT.METHOD, Payment.Option, Terms, To.Be.Emailed, Shipping.Name, Shipping.Address1, Shipping.Address2, Shipping.City, Shipping.Province, Shipping.Country, Shipping.Postal.Code, Billing.Name, Billing.Address1, Billing.Address2, Billing.City, Billing.Province, Billing.Country, Billing.Postal.Code, Department, Class, Warehouse, Recipient, Recipient.Email, Recipient.Phone, Shipstation.Carrier, Shipstation.Shipping.Service, SHIPSTATION.SERVICE, Order.Issue, Memo)
 netsuite_so <- netsuite_so %>% rename_with(~ gsub("\\.", " ", colnames(netsuite_so)))
 write_excel_csv(netsuite_so, file = paste0("../XHS/SO-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
@@ -83,6 +83,7 @@ openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("produc
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 products_XHS[products_XHS=="NA"] <- ""
 products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 5, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = ifelse(grepl("^L", SKU), woo[SKU, "Sale.price"] + 10, woo[SKU, "Sale.price"]), Compare.At.Price = ifelse(grepl("^L", SKU), woo[SKU, "Regular.price"] + 10, woo[SKU, "Regular.price"]), Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
+products_upload <- products_XHS %>% mutate(Inventory = ifelse(grepl("^MWPF", SKU), 0, Inventory))
 products_upload <- products_upload %>% mutate(Product.Name = products_description[toupper(SPU), "Product.Name"], SEO.Product.Name = Product.Name, Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), na.string = "")
@@ -346,7 +347,7 @@ write.csv(JJ_orders_propotion, file = paste0("../woo/JJ_orders_propotion_", Sys.
 
 # ------------ upload regular POs -------------------
 library(stringi)
-season <- "25F"
+season <- "26S"
 folder <- stri_remove_empty(gsub(" *- *sent", "", gsub(paste0("\\.\\.\\/PO\\/order\\/", season, "\\/"), "", list.files(path = paste0("../PO/order/", season, "/"), pattern = "^P"))))
 SeasonStart <- read.csv("../PO/SeasonStart.csv", as.is = T) %>% mutate(receive_date = format(as.Date(paste0(arrival_date, "-2025"), format = "%d-%B-%Y"), "%m/%d/%Y")) %>% `row.names<-`(.[, "category"]) 
 PO_NS <- data.frame(); total <- 0; items <- 0
@@ -458,14 +459,14 @@ print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_
 write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_regular_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
 # ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits, US-BabiesR -------------------
-ID <- "P547"; season <- "26S"; type <- "CA-Clement"; warehouse <- "WH-SURREY"
+ID <- "P553"; season <- "26S"; type <- "CZ-Mylerie"; warehouse <- "WH-CHINA"
 file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
 PO_NS <- data.frame(); total <- 0; items <- 0; CAT <- c()
 for(f in file){
   sheets <- getSheetNames(f)[getSheetNames(f) != "Export Summary"]
   memo <- gsub(paste0(".*", ID, " *\\- *"), "", gsub(paste0("\\/", ID, "-.*\\.xlsx"), "", f))
   for(s in sheets){
-    print(c(memo, s))
+    print(c(f, s))
     PO <- openxlsx::read.xlsx(f, sheet = s, startRow = 8)
     ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_WS <- PO %>% select("产品编号", "订单.总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
@@ -496,8 +497,8 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "25F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "25FWCA15"; ShippingDate <- "8/27/2025"; ReceiveDate <- "9/27/2025"; AMZ.Shipment.ID <- ""
+season <- "25F"; warehouse <- "WH-CHINA"; PO_suffix <- "-CN"
+RefNo <- "25FWCN4"; ShippingDate <- "9/24/2025"; ReceiveDate <- "9/24/2025"; AMZ.Shipment.ID <- ""
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -545,7 +546,7 @@ OverReceive <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_",
 if(nrow(OverReceive)){
   View(OverReceive)
   PO_OverReceive <- OverReceive %>% mutate(PO.TYPE = "Over Received", CATEGORY = "MIX", SEASON = season, REF.NO = paste0("Over.", RefNo), WAREHOUSE = gsub("FBA", "WH-AMZ : FBA", warehouse), VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("Over receiving in shipment ", RefNo), ITEM. = ITEM, QUANTITY. = Qty, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
-    select(PO.TYPE:External.ID) %>% group_by(ITEM.) %>% mutate(QUANTITY. = sum(QUANTITY.)) %>% distinct(ITEM., .keep_all = T) %>% ungroup() %>% rename_with(~ gsub("\\.", " ", .))
+    select(PO.TYPE:External.ID, REF.NO, MEMO) %>% group_by(ITEM.) %>% mutate(QUANTITY. = sum(QUANTITY.)) %>% distinct(ITEM., .keep_all = T) %>% ungroup() %>% rename_with(~ gsub("\\.", " ", .))
   write.csv(PO_OverReceive, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_PO_", RefNo, "_OverReceive.csv"), row.names = F, na = "")
 }else{
   print("No over-receiving. ")
@@ -553,7 +554,7 @@ if(nrow(OverReceive)){
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000293" # over-receiving PO 
+  p <- "PO#PO000413" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
