@@ -19,6 +19,8 @@ woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-pr
 #woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
 #  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 #woo <- woo %>% mutate(Sale.price = ifelse(grepl("^[HGUS]", SKU), round(0.8*Regular.price, 2), Sale.price))
+Cat_sale <- data.frame(CAT = c("LBT","LBP", "LAN", "LAB", "LCT", "LCP", "FJM", "FPM", "FSM", "FJC", "FVM", "FHA", "FMR", "FAN", "KHB", "KHP", "KMN", "KMT", "KEH"), discount = c(rep(0.8, 17), rep(0.6, 2))) %>% `row.names<-`(.[, "CAT"])
+woo <- woo %>% mutate(cat = gsub("-.*", "", SKU), Sale.price = ifelse(cat %in% Cat_sale$CAT, round(Regular.price * Cat_sale[cat, "discount"], 2), Sale.price))
 
 # ------------- upload Clover SO to NS, correct Clover inventory and update price: daily ---------------------------
 customer <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Customers-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>%
