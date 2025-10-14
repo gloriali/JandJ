@@ -19,6 +19,8 @@ woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-pr
 #woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
 #  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 #woo <- woo %>% mutate(Sale.price = ifelse(grepl("^[HGUS]", SKU), round(0.8*Regular.price, 2), Sale.price))
+Cat_sale <- data.frame(CAT = c("LBT","LBP", "LAN", "LAB", "LCT", "LCP", "FJM", "FPM", "FSM", "FJC", "FVM", "FHA", "FMR", "FAN", "KHB", "KHP", "KMN", "KMT", "KEH"), discount = c(rep(0.8, 17), rep(0.6, 2))) %>% `row.names<-`(.[, "CAT"])
+woo <- woo %>% mutate(cat = gsub("-.*", "", SKU), Sale.price = ifelse(cat %in% Cat_sale$CAT, round(Regular.price * Cat_sale[cat, "discount"], 2), Sale.price))
 
 # ------------- upload Clover SO to NS, correct Clover inventory and update price: daily ---------------------------
 customer <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Customers-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>%
@@ -83,7 +85,7 @@ openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("produc
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 products_XHS[products_XHS=="NA"] <- ""
 products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 5, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = ifelse(grepl("^L", SKU), woo[SKU, "Sale.price"] + 10, woo[SKU, "Sale.price"]), Compare.At.Price = ifelse(grepl("^L", SKU), woo[SKU, "Regular.price"] + 10, woo[SKU, "Regular.price"]), Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
-products_upload <- products_XHS %>% mutate(Inventory = ifelse(grepl("^MWPF", SKU), 0, Inventory))
+products_upload <- products_upload %>% mutate(Inventory = ifelse(grepl("^MWPF", SKU), 0, Inventory))
 products_upload <- products_upload %>% mutate(Product.Name = products_description[toupper(SPU), "Product.Name"], SEO.Product.Name = Product.Name, Description = products_description[toupper(SPU), "Description"], Mobile.Description = products_description[toupper(SPU), "Description"], SEO.Description = products_description[toupper(SPU), "Description"], Describe = products_description[toupper(SPU), "Description"])
 colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), na.string = "")
