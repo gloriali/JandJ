@@ -15,16 +15,19 @@ library(scales)
 library(knitr)
 library(lubridate)
 library(gridExtra)
-Payment <- read.csv("../Clover/Sales240813-241230/Payments-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% filter(Result == "SUCCESS", Amount != 0) %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name, Payment.ID)
-Refund <- read.csv("../Clover/Sales240813-241230/Refunds-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Refund.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% select(Date, Month, DayOfWeek, Refund.Amount, Refund.ID)
+Clover_customer <- read.csv("../Clover/Customers-20251208_0943_PST.csv", as.is = T) %>% mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "") %>% `row.names<-`(.[, "Name"])
+JJR_customer <- read.csv("../Clover/Sales2412-2511/wc-customers-report-export-17653189392578.csv", as.is = T) %>% distinct(Email, .keep_all = T) %>% `row.names<-`(.[, "Email"])
+Payment <- read.csv("../Clover/Sales2412-2511/CloverSO-202412-202511_excludeWarehouseSale.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Payment.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a"), Email = Clover_customer[Customer.Name, "Email.Address"], City = JJR_customer[Email, "City"], Province = JJR_customer[Email, "Region"], Postal.Code = JJR_customer[Email, "Postal.Code"]) %>% filter(Result == "SUCCESS", Amount != 0, Order.Employee.Name != "Garman") %>% select(Date, Month, DayOfWeek, Tender, Amount, Tax.Amount, Customer.Name, Email, City, Province, Postal.Code, Payment.ID)
 Payment_daily <- Payment %>% group_by(Date) %>% summarise(Amount = sum(Amount), N = n())
-days <- seq(from = as.Date("2024-09-09"), to = as.Date("2024-12-24"), by = "days")
-workdays <- days[wday(days) != 1 & !days %in% c("2024-10-14", "2024-11-11")]
+days <- seq(from = as.Date("2024-12-01"), to = as.Date("2025-11-30"), by = "days")
+workdays <- days[wday(days) != 1 & !days %in% c(seq(from = as.Date("2024-12-25"), to = as.Date("2025-01-01"), by = "days"), "2025-02-17", "2025-04-18", "2025-04-21", "2025-05-19", "2025-07-01", "2025-08-04", "2025-09-01", "2025-09-30", "2025-10-13", "2025-11-11", "2025-07-12", seq(from = as.Date("2025-07-16"), to = as.Date("2025-07-19"), by = "days"))]
 Payment_daily <- rbind(Payment_daily, data.frame(Date = workdays[!workdays %in% Payment_daily$Date], Amount = 0, N = 0)) %>% arrange(Date)
-JJR_payment <- read.csv("../Clover/Sales240813-241230/JJR-orders-20240909-20241224.csv", as.is = T) %>% distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date))) %>% filter(Shipping.Zone == "Canada BC", Date < "2024-12-25")
+JJR_payment <- read.csv("../Clover/Sales2412-2511/wc-orders-BC-202412-202511.csv", as.is = T) %>% distinct(Order.Number, .keep_all = T) %>% mutate(Date = as.Date(gsub(" .*", "", Order.Date)))
+
+Refund <- read.csv("../Clover/Sales2412-2511/Refunds-20240909-20241231.csv", as.is = T) %>% mutate(Date = as.Date(gsub(" .*", "", Refund.Date), format = "%d-%b-%Y"), Month = format(Date, "%b"), DayOfWeek = format(Date, "%a")) %>% select(Date, Month, DayOfWeek, Refund.Amount, Refund.ID)
 ```
 
-This is report of Richmond showroom performance from Sept 09 2024 (NetSuite integration) to Dec 24 2024.  
+This is report of Richmond showroom performance from Dec 01 2024 to Nov 30 2025.  
 
 ## Summary
 
