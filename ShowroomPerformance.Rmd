@@ -142,7 +142,24 @@ JJR_gva_map_data_final <- left_join(fsa_in_gva, JJR_map, by = c("CFSAUID" = "fsa
   labs(title = "Website Customers", x = NULL, y = NULL) +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), legend.key.size = unit(0.5, "cm")))
-pop_data <- read.csv("../Clover/Sales2412-2511/BC_population_census.csv", as.is = T)
+Population_map <- read.csv("../Clover/Sales2412-2511/Population_census2021.csv", as.is = T) %>% mutate(Occupied.Dwellings = as.numeric(gsub(",", "", Occupied.Dwellings)))
+Population_gva_map_data_final <- left_join(fsa_in_gva, Population_map, by = c("CFSAUID" = "FSA")) %>%
+  mutate(Occupied.Dwellings = replace_na(Occupied.Dwellings, 0))
+(Population_map_plot <- ggplot(data = Population_gva_map_data_final) +
+  geom_sf(aes(fill = Occupied.Dwellings), color = "white", linewidth = 0.2) +
+  # Add the city outlines layer ON TOP of the FSA colors
+  geom_sf(data = gva_municipalities_filtered, fill = NA, color = "darkgrey", linewidth = 0.8) +
+  # Add the city labels layer
+  ggrepel::geom_label_repel(data = cities_in_gva, aes(label = as.character(NAME), geometry = geometry),
+    stat = "sf_coordinates", # Tells ggrepel to use the sf coordinates
+    min.segment.length = 0, box.padding = 0.5, point.padding = 0.5, size = 3.5, color = "black", fontface = "bold") +
+  # Ensure points for cities are visible
+  geom_sf(data = cities_in_gva, color = "red", size = 2) +
+  scale_fill_viridis_c(option = "plasma", name = "# Dwellings", direction = -1, limits = c(0, max(Population_gva_map_data_final$Occupied.Dwellings))) +
+  labs(title = "Occupied Dwellings", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), legend.key.size = unit(0.5, "cm")))
+
 ```
 
 ### Sales by category
