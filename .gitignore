@@ -1,8 +1,8 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
 JandJ.Rproj
-.ipynb_checkpoints
--TWK-Gloria.Rhistory
+*.ipynb_checkpoints
 .gitignore
+hs_err_pid21402.log
