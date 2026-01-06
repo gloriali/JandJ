@@ -145,18 +145,23 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # upload to NS & email Shikshit
 
 # ---------------- Check and update AMZPrep shipment orders ---------------
-shipments <- openxlsx::read.xlsx(list.files(path = "../AMZPrep/", pattern = paste0("ShipmentOrder_", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = 1)
+synced <- openxlsx::read.xlsx("../AMZPrep/SyncedOrder.xlsx", sheet = 1)
+shipped <- openxlsx::read.xlsx("../AMZPrep/ShippedOrder.xlsx", sheet = 1)
 records <- openxlsx::loadWorkbook("../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx")
-records_AMZPrep <- readWorkbook(records, "Shipments") %>% mutate(eShipper.Status = ifelse(Order.ID %in% shipments$Extra.Note.1, "Synced", eShipper.Status))
-new_records <- shipments %>% filter(!(Extra.Note.1 %in% records_AMZPrep$Order.ID)) %>% 
+records_AMZPrep <- readWorkbook(records, "Shipments", detectDates = T) %>% mutate(eShipper.Status = ifelse(Order.ID %in% synced$Extra.Note.1, "Synced", ifelse(Order.ID %in% shipped$Extra.Note.1, "Shipped", eShipper.Status)))
+new_synced <- synced %>% filter(!(Extra.Note.1 %in% records_AMZPrep$Order.ID)) %>% 
   mutate(Date = gsub(" .*", "", Shipment.Order.Date), Order.ID = Extra.Note.1, Shipped.from.eShipper = "Whole", Province = `Billing.State.Code/Region`, Total.Qty = Total.Quantity, eShipper.Qty = Total.Quantity, Auto.FR = "Y", Shipping.Required = ifelse(Shipping.Service == "Cheapest Service", "", "Express"), FR.Created = "Y", eShipper.Status = "Synced", Items = ifelse(Total.Quantity == 1, SKU, "")) %>%
   select(Date:Items) %>% distinct(Order.ID, .keep_all = T)
-records_AMZPrep <- rbind(records_AMZPrep, new_records)
+new_shipped <- shipped %>% filter(!(Extra.Note.1 %in% records_AMZPrep$Order.ID)) %>% 
+  mutate(Date = gsub(" .*", "", Shipment.Order.Date), Order.ID = Extra.Note.1, Shipped.from.eShipper = "Whole", Province = `Billing.State.Code/Region`, Total.Qty = Total.Quantity, eShipper.Qty = Total.Quantity, Auto.FR = "Y", Shipping.Required = ifelse(Shipping.Service == "Cheapest Service", "", "Express"), FR.Created = "Y", eShipper.Status = "Shipped", Items = ifelse(Total.Quantity == 1, SKU, "")) %>%
+  select(Date:Items) %>% distinct(Order.ID, .keep_all = T)
+records_AMZPrep <- rbind(records_AMZPrep, new_synced, new_shipped)
 records_AMZPrep <- records_AMZPrep %>% rename_with(~ gsub("\\.", " ", colnames(records_AMZPrep)))
 deleteData(records, sheet = "Shipments", cols = 1:ncol(records_AMZPrep), rows = 1:nrow(records_AMZPrep), gridExpand = T)
 writeData(records, sheet = "Shipments", records_AMZPrep)
 openxlsx::saveWorkbook(records, file = "../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx", overwrite = T)
-
+duplicated <- rbind(synced, shipped) %>% mutate(SO = gsub("-.*", "", Order.Code), FR = gsub(".*-", "", Order.Code)) %>% group_by(SO) %>% filter(n_distinct(FR) > 1) %>% ungroup() %>% 
+  select(Order.Code:Status) %>% distinct(Order.Code, .keep_all = T) %>% arrange(Order.Code)
 
 # ---------------- Adjust Clover Inventory: at request --------------------
 # download current Richmond stock: clover_item > Inventory > Items > Export
