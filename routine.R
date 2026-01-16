@@ -22,6 +22,13 @@ woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-pr
 #Cat_sale <- data.frame(CAT = c("LBT","LBP", "LAN", "LAB", "LCT", "LCP", "FJM", "FPM", "FSM", "FJC", "FVM", "FHA", "FMR", "FAN", "KHB", "KHP", "KMN", "KMT", "KEH"), discount = c(rep(0.8, 17), rep(0.6, 2))) %>% `row.names<-`(.[, "CAT"])
 #woo <- woo %>% mutate(cat = gsub("-.*", "", SKU), Sale.price = ifelse(cat %in% Cat_sale$CAT, round(Regular.price * Cat_sale[cat, "discount"], 2), Sale.price))
 
+# ------------- upload Richmond returns/exchanges to NS: weekly ---------------------------
+return <- openxlsx::read.xlsx("../../TWK 2020 share/twk general/2 - show room operations/0-Showroom records.xlsx", sheet = 1, detectDates = T, fillMergedCells = T) %>% filter(is.na(NS.Action)) %>% 
+  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = `Return.Item.SKU.(Inv.in)`, ADJUST.QTY.BY = Return.Qty, Reason.Code = ifelse(is.na(Exchange.Qty), "RT", "EXC"), MEMO = paste0(Original.Order.ID, " | ", Order.Channel, " | ", Return.Reason, " | ", Notes), WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
+  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
+colnames(return) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(return)))
+write.csv(return, file = paste0("../Clover/RT-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
+
 # ------------- upload Clover SO to NS, correct Clover inventory and update price: daily ---------------------------
 customer <- read.csv("../Clover/Customers.csv", as.is = T) %>% mutate(Name = paste0(First.Name, " ", Last.Name)) %>% distinct(Email.Address, .keep_all = T) %>% filter(Name != " ", Email.Address != "") %>% `row.names<-`(.[, "Name"])
 payments <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "Payments-", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% mutate(Phone = customer[Customer.Name, "Phone.Number"], Email = customer[Customer.Name, "Email.Address"]) %>% filter(Result == "SUCCESS") %>% `row.names<-`(.[, "Order.ID"]) 
@@ -96,16 +103,12 @@ colnames(products_upload) <- gsub("\\.", " ", colnames(products_upload))
 openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), na.string = "")
 # upload to AllValue > Products
 
-# ------------- upload Richmond returns/exchanges to NS: weekly ---------------------------
-return <- openxlsx::read.xlsx("../../TWK 2020 share/twk general/2 - show room operations/0-Showroom records.xlsx", sheet = 1, detectDates = T, fillMergedCells = T) %>% filter(is.na(NS.Action)) %>% 
-  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = `Return.Item.SKU.(Inv.in)`, ADJUST.QTY.BY = Return.Qty, Reason.Code = ifelse(is.na(Exchange.Qty), "RT", "EXC"), MEMO = paste0(Original.Order.ID, " | ", Order.Channel, " | ", Return.Reason, " | ", Notes), WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
-  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
-colnames(return) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(return)))
-write.csv(return, file = paste0("../Clover/RT-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
-
 # ------------- Sync NS Richmond inventory with Clover: weekly ---------------------------
+netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND") %>% `row.names<-`(.[, "Name"]) 
 clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
-inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(Name %in% netsuite_item_R$Name, Quantity - netsuite_item_R[Name, "Warehouse.On.Hand"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
+inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(Name %in% netsuite_item_R$Name, Quantity - netsuite_item_R[Name, "Warehouse.Available"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
   select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, Status, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
