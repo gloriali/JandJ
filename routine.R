@@ -586,7 +586,7 @@ if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# mat
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
 # check for over-receiving
-shipment <- shipment %>% mutate(PO.REF.NO = ifelse(PO == "PO#NA", gsub("-.*", "", PO.REF.NO), PO.REF.NO), PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
+shipment <- shipment %>% mutate(PO.REF.NO = ifelse(PO == "PO#NA", gsub("-[^-]*$", "", PO.REF.NO), PO.REF.NO), PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
 shipment <- shipment %>% group_by(PO.REF.NO, ITEM) %>% mutate(QUANTITY = sum(QUANTITY), BOX.NO = paste0(BOX.NO, collapse = " | ")) %>% distinct(PO.REF.NO, ITEM, .keep_all = T) %>% ungroup()
 OverReceive <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), Qty = QUANTITY - Qty.Remain) %>% filter(QUANTITY > Qty.Remain)
 if(nrow(OverReceive)){
