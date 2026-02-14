@@ -6,3 +6,4 @@ JandJ.Rproj
 *.ipynb_checkpoints
 .gitignore
 hs_err_pid21402.log
+.Rproj.user
