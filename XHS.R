@@ -43,10 +43,10 @@ products_description <- products_description %>% mutate(Product.Name = products_
 write.xlsx(products_description, file = "../XHS/products_description.xlsx", row.names = F)
 
 ### -------- create new listing ------------------------
-new_season <- "25"
+new_season <- "26"
 mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% mutate(SPU = paste(Category.SKU, Print.SKU, sep = "-")) %>% `row.names<-`(toupper(.[, "MSKU"]))
 catprint <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU_CatPrintsFactory.xlsx", full.names = T), sheet = "SKU - product category", fillMergedCells = T) %>% filter(!duplicated(Category_SKU)) %>% `row.names<-`(.[, "Category_SKU"])
-image <- read.csv("../woo/ImageSrc.csv", as.is = T, header = T) %>% `row.names<-`(.[, "SKU"])
+image <- read.table("../woo/ImageSrc.txt", as.is = T, header = T, sep = "\t") %>% `row.names<-`(.[, "SKU"])
 woo$cat <- ifelse(woo$SKU %in% mastersku$MSKU, mastersku[woo$SKU, "Category.SKU"], gsub("-.*", "", woo$SKU))
 wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
 openxlsx::protectWorkbook(wb, protect = F)
@@ -56,11 +56,11 @@ products_XHS[products_XHS=="NA"] <- ""
 
 #### description and details for the new listing
 ##### Add a new category
-categories_exclude <- c("TTSU", "TTLU", "PLAU", "KSCU", "TICKET", "Fall_Legging", "SSW", "SSS", "SKT", "SKB-INSOL", "MWPS", "MWPF", "MSXP", "MSKB", "MKMT", "DEAL-MISC-KCS", "GUB-BOX", "GUB-AST", "FMG", "FVMU", "AWP", "AAP")
+categories_exclude <- c("TPLU", "TPSU", "WPFU", "WJAU", "WJSU", "WPSU", "PWJ", "TTSU", "TTLU", "PLAU", "KSCU", "TICKET", "Fall_Legging", "SSW", "SSS", "SKT", "SKB-INSOL", "MWPS", "MWPF", "MSXP", "MSKB", "MKMT", "DEAL-MISC-KCS", "GUB-BOX", "GUB-AST", "FMG", "FVMU", "AWP", "AAP")
 item_new <- netsuite_item_S %>% filter(!(Name %in% products_XHS$SKU), Warehouse.Available >= 5, !(Item.Category.SKU %in% categories_exclude))
 products_description <- read.xlsx2("../XHS/products_description.xlsx", sheetIndex = 1)
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
-products_description_cat <- rbind(products_description_cat, data.frame(cat = unique(item_new$Item.Category.SKU)[!(unique(item_new$Item.Category.SKU) %in% products_description_cat$cat)]) %>% mutate(Product.Name = catprint[cat, "Chinese_Name"], Description = "", Categories = catprint[cat, "Parent_Category.(Chinese)"], Option1.Name = "Size"))
+products_description_cat <- rbind(products_description_cat, data.frame(cat = unique(item_new$Item.Category.SKU)[!(unique(item_new$Item.Category.SKU) %in% products_description_cat$cat)]) %>% mutate(Product.Name = paste("Jan & Jul", catprint[cat, "Chinese_Name"]), Description = "", Categories = catprint[cat, "Parent_Category.(Chinese)"], Option1.Name = "Size"))
 write.xlsx(products_description_cat, file = "../XHS/products_description_categories.xlsx", row.names = F)
 # !open products_description_cat in excel and fill in info
 products_description_cat <- read.xlsx2("../XHS/products_description_categories.xlsx", sheetIndex = 1) %>% `row.names<-`(.[, "cat"])
@@ -75,7 +75,7 @@ new_listing <- data.frame(SKU = item_new$Name) %>%
   filter(status == "Active", !is.na(Price), !(SKU %in% toupper(products_XHS$SKU)), cat %in% products_description_cat$cat, SPU %in% products_description$SPU)  %>% 
   select(SPU, Product.Name, Description, Mobile.Description, Vendor, Categories, Tags, Option1.Name, Option1.Value, Option2.Name, Option2.Value, Option3.Name, Option3.Value, SKU, Weight, Price, Compare.At.Price, Requires.Shipping, Taxable, Barcode, Image.Src, Image.Position, SEO.Product.Name, SEO.Description, Variant.Image, Weight.Unit, Cost.Price, Inventory, Describe)
 new_listing <- rbind(products_XHS %>% select(-Status) %>% mutate(SPU = toupper(SPU)), new_listing) %>% distinct(SKU, .keep_all = T) %>% arrange(SKU) %>% 
-  mutate(Product.Name = products_description[SPU, "Product.Name"], Description = products_description[SPU, "Description"], Mobile.Description = Description, Vendor = "Jan & Jul", Categories = products_description[SPU, "Categories"], Option1.Name = products_description[SPU, "Option1.Name"], Option1.Value = mastersku[toupper(SKU), "Size"], Option2.Name = "", Option2.Value = "", Option3.Name = "", Option3.Value = "", Weight = woo[toupper(SKU), "Weight..g."], Price = woo[toupper(SKU), "Sale.price"], Compare.At.Price = woo[toupper(SKU), "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[toupper(SKU), "UPC.Active"], Image.Src = products_description[SPU, "Image.Src"], Image.Position = "", SEO.Product.Name = Product.Name, SEO.Description = Description, Variant.Image = "", Weight.Unit = "g", Cost.Price = "", Describe = "", Inventory = ifelse(netsuite_item_S[toupper(SKU), "Warehouse.Available"] < 20, 0, netsuite_item_S[toupper(SKU), "Warehouse.Available"]))
+  mutate(Product.Name = products_description[SPU, "Product.Name"], Description = products_description[SPU, "Description"], Mobile.Description = Description, Vendor = "Jan & Jul", Categories = products_description[SPU, "Categories"], Option1.Name = products_description[SPU, "Option1.Name"], Option1.Value = mastersku[toupper(SKU), "Size"], Option2.Name = "", Option2.Value = "", Option3.Name = "", Option3.Value = "", Weight = woo[toupper(SKU), "Weight..g."], Price = woo[toupper(SKU), "Sale.price"], Compare.At.Price = woo[toupper(SKU), "Regular.price"], Tags = ifelse(Price == Compare.At.Price, "正价", "特价"), Requires.Shipping = "TRUE", Taxable = "TRUE", Barcode = mastersku[toupper(SKU), "UPC.Active"], Image.Src = products_description[SPU, "Image.Src"], Image.Position = "", SEO.Product.Name = Product.Name, SEO.Description = Description, Variant.Image = "", Weight.Unit = "g", Cost.Price = "", Describe = "", Inventory = ifelse(netsuite_item_S[toupper(SKU), "Warehouse.Available"] < 20, 0, netsuite_item_S[toupper(SKU), "Warehouse.Available"])) %>% filter(Inventory > 0)
 colnames(new_listing) <- gsub("\\.", " ", colnames(new_listing))
 openxlsx::write.xlsx(new_listing, file = paste0("../XHS/new_listing-", format(Sys.Date(), "%Y-%m-%d"), ".xlsx"), sheetName = "Sample")
 # upload to AllValue > Products > change status to "Listed". All Value > Little Red Book Applet > Products management > Add promotional product > Select categories
