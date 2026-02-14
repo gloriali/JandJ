@@ -1,12 +1,14 @@
 # Routine tasks
 library(dplyr)
 library(stringr)
-library(openxlsx)
+library(openxlsx2)
 library(xlsx)
 library(scales)
 library(ggplot2)
 library(tidyr)
 library(readr)
+library(janitor)
+options("openxlsx2.na" = "")
 
 # input: NS > Items > Export all warehouses
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
@@ -17,6 +19,7 @@ netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND"
 woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "AWWJ", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
+sales <- read.csv("../Clover/Lunar New Year Sales - Variation Prices.csv", as.is = T) %>% `row.names<-`(.[, "SKU"]) 
 #woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
 #  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 #woo <- woo %>% mutate(Sale.price = ifelse(grepl("^[HGUS]", SKU), round(0.8*Regular.price, 2), Sale.price))
@@ -24,10 +27,9 @@ PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "
 #woo <- woo %>% mutate(cat = gsub("-.*", "", SKU), Sale.price = ifelse(cat %in% Cat_sale$CAT, round(Regular.price * Cat_sale[cat, "discount"], 2), Sale.price))
 
 # ------------- upload Richmond returns/exchanges to NS: weekly ---------------------------
-return <- openxlsx::read.xlsx("../../TWK 2020 share/twk general/2 - show room operations/0-Showroom records.xlsx", sheet = "ReturnExchange", detectDates = T, fillMergedCells = T) %>% filter(is.na(NS.Action)) %>% 
-  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = `Return.Item.SKU.(Inv.in)`, ADJUST.QTY.BY = Return.Qty, Reason.Code = ifelse(is.na(Exchange.Qty), "RT", "EXC"), MEMO = paste0(Original.Order.ID, " | ", Order.Channel, " | ", Return.Reason, " | ", Notes), WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
-  select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
-colnames(return) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(return)))
+return <- read_xlsx("../../TWK 2020 share/twk general/2 - show room operations/0-Showroom records.xlsx", sheet = "ReturnExchange", detect_dates = T, fill_merged_cells = T) %>% remove_empty(which = c("rows", "cols")) %>% filter(is.na(`NS Action`)) %>% 
+  mutate(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = `Return Item SKU`, `ADJUST QTY. BY` = `Return Qty`, `Reason Code` = ifelse(is.na(`Exchange Qty`), "RT", "EXC"), MEMO = paste0(`Original Order ID`, " | ", `Order Channel`, " | ", `Return Reason`, " | ", Notes), WAREHOUSE = "WH-RICHMOND", `External ID` = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-1")) %>%
+  select(Date, ITEM, `ADJUST QTY. BY`, `Reason Code`, MEMO, WAREHOUSE, `External ID`) %>% filter(`ADJUST QTY. BY` != 0)
 write.csv(return, file = paste0("../Clover/RT-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 
 # ------------- upload Clover SO to NS, correct Clover inventory and update price: daily ---------------------------
@@ -43,19 +45,20 @@ update_INV <- T
 adjust_inventory <- clover_so %>% filter(Order.Employee.Name == "Garman") %>% group_by(Item.SKU) %>% summarise(Quantity = n()) %>% as.data.frame() %>% `row.names<-`(.[, "Item.SKU"])
 price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
 price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "MISC25", "MISC30", "MISC35", "MISC45", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK", "MAJC"), Price = c(5, 10, 15, 20, 25, 30, 35, 45, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30, 99.99))) %>% `row.names<-`(toupper(.[, "cat"])) 
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T)) |> wb_remove_worksheet(sheet = 1) 
+clover_update <- wb_workbook()
+for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
 if(update_INV){
   print("Update INV")
-  clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity)) %>% filter(Name != "") %>% 
-    mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
+  clover_item <- wb_to_df(clover, "Items") %>% mutate(Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity)) %>% filter(Name != "") %>% 
+    mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
   }else{
-  clover_item <- readWorkbook(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Alternate.Name = woo[Name, "Name"], Tax.Rates = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
+  clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
 }
 clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^SS", Name), 10, Price))
-clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
-deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item) + 100, gridExpand = T)
-writeData(clover, sheet = "Items", clover_item)
-openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+#clover_item <- clover_item %>% mutate(Price = ifelse(Name %in% sales$SKU, sales[Name, "Sale.price"], Price)) 
+clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item)
+wb_save(clover_update, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
 # -------- Add POS sales to yotpo rewards program: daily -----------
 # customer info: Clover > Customers > Download
@@ -72,10 +75,10 @@ non_included <- bind_rows(non_included, error %>% select(Email, Points)) %>% cou
 write.table(non_included, file = "../yotpo/non_included.csv", sep = ",", row.names = F, col.names = c("Email", "Points"))
 
 # ------------- upload XHS SO to NS, sync XHS price and inventory: weekly ---------------------------
-XHS_so <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../XHS/", pattern = "order_export", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1) %>%
-  mutate(Shipping.Address2 = replace_na(Shipping.Address2, ""), Shipping.Address1 = paste(Shipping.Address1, Shipping.Address2), Shipping.Country = gsub("加拿大", "CA", gsub("美国", "US", Shipping.Country)), Shipping.Province = gsub("不列颠哥伦比亚", "BC", Shipping.Province))
-netsuite_so <- XHS_so %>% filter(Financial.Status == "paid", Shipping.Country == "中国") %>% mutate(Order.date = format(as.Date(gsub(" .*", "", Created.At), "%Y-%m-%d"), "%m/%d/%Y")) %>% 
-  mutate(Payment.Option = "AlphaPay", Class = "FBM : CN", MEMO = "XHS sales", Customer = "56 XHS CN", Order.ID = Order.No, REF.ID = paste0("XHSCN-", Order.No), Order.Type = "XHS CN", Department = "Retail : Marketplace : XiaoHongShu", Warehouse = "WH-RICHMOND", Item.SKU = LineItem.SKU, Quantity = as.numeric(LineItem.Quantity), Price.level = "Custom", Rate = round((as.numeric(LineItem.Total) - as.numeric(LineItem.Total.Discount))/Quantity, 2), Coupon.Discount = as.numeric(LineItem.Total.Discount), Coupon.Discount = ifelse(Coupon.Discount == 0, "", Coupon.Discount), Coupon.Code = "", Tax.Amount = "", Tax.Code = "", Recipient = paste0(Shipping.Last.Name, Shipping.First.Name), Recipient.Phone = Phone, Recipient.Email = Email, SHIPPING.CARRIER = "Longxing", SHIPPING.METHOD = "", SHIPPING.COST = Shipping) %>% 
+XHS_so <- read_xlsx(rownames(file.info(list.files(path = "../XHS/", pattern = "order_export", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1) %>%
+  mutate(`Shipping Address2` = ifelse(is.na(`Shipping Address2`), "", `Shipping Address2`), Shipping.Address1 = paste(`Shipping Address1`, `Shipping Address2`), Shipping.Country = gsub("加拿大", "CA", gsub("美国", "US", `Shipping Country`)), Shipping.Province = gsub("不列颠哥伦比亚", "BC", `Shipping Province`))
+netsuite_so <- XHS_so %>% filter(`Financial Status` == "paid", Shipping.Country == "中国") %>% mutate(Order.date = format(as.Date(gsub(" .*", "", `Created At`), "%Y-%m-%d"), "%m/%d/%Y")) %>% 
+  mutate(Payment.Option = "AlphaPay", Class = "FBM : CN", MEMO = "XHS sales", Customer = "56 XHS CN", Order.ID = `Order No`, REF.ID = paste0("XHSCN-", `Order No`), Order.Type = "XHS CN", Department = "Retail : Marketplace : XiaoHongShu", Warehouse = "WH-RICHMOND", Item.SKU = `LineItem SKU`, Quantity = as.numeric(`LineItem Quantity`), Price.level = "Custom", Rate = round((as.numeric(`LineItem Total`) - as.numeric(`LineItem Total Discount`))/Quantity, 2), Coupon.Discount = as.numeric(`LineItem Total Discount`), Coupon.Discount = ifelse(Coupon.Discount == 0, "", Coupon.Discount), Coupon.Code = "", Tax.Amount = "", Tax.Code = "", Recipient = paste0(`Shipping Last Name`, `Shipping First Name`), Recipient.Phone = Phone, Recipient.Email = Email, SHIPPING.CARRIER = "Longxing", SHIPPING.METHOD = "", SHIPPING.COST = Shipping) %>% 
   select(Payment.Option, Class, Order.date, REF.ID, Order.Type, Department, Warehouse, MEMO, Order.ID, Item.SKU, Quantity, Price.level, Rate, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount, Customer, Recipient, Recipient.Phone, Recipient.Email, SHIPPING.CARRIER, SHIPPING.METHOD, SHIPPING.COST)
 Encoding(netsuite_so$Recipient) = "UTF-8"
 write_excel_csv(netsuite_so, file = paste0("../XHS/CashSale-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
@@ -91,10 +94,10 @@ netsuite_so <- netsuite_so %>% rename_with(~ gsub("\\.", " ", colnames(netsuite_
 write_excel_csv(netsuite_so, file = paste0("../XHS/SO-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 ## upload to NS
 # input: AllValue > Products > Export > All products
-products_description <- openxlsx::read.xlsx("../XHS/products_description.xlsx", sheet = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
-wb <- openxlsx::loadWorkbook(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
+products_description <- read_xlsx("../XHS/products_description.xlsx", sheet = 1) %>% `row.names<-`(toupper(.[, "SPU"])) 
+wb <- wb_load(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T))
 openxlsx::protectWorkbook(wb, protect = F)
-openxlsx::saveWorkbook(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
+wb_save(wb, list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), overwrite = T)
 products_XHS <- read.xlsx2(list.files(path = "../XHS/", pattern = paste0("products_export\\(", format(Sys.Date(), "%Y-%m-%d"), ".*.xlsx"), full.names = T), sheetIndex = 1)
 products_XHS[products_XHS=="NA"] <- ""
 products_upload <- products_XHS %>% mutate(Inventory = ifelse(netsuite_item_S[SKU, "Warehouse.Available"] < 5, 0, netsuite_item_S[SKU, "Warehouse.Available"]), Price = ifelse(grepl("^L", SKU), woo[SKU, "Sale.price"] + 10, woo[SKU, "Sale.price"]), Compare.At.Price = ifelse(grepl("^L", SKU), woo[SKU, "Regular.price"] + 10, woo[SKU, "Regular.price"]), Tags = ifelse(Price == Compare.At.Price, "正价", "特价"))
@@ -108,14 +111,14 @@ openxlsx::write.xlsx(products_upload, file = paste0("../XHS/products_upload-", f
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND") %>% `row.names<-`(.[, "Name"]) 
-clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
+clover_item <- read_xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item_R$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
 inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(Name %in% netsuite_item_R$Name, Quantity - netsuite_item_R[Name, "Warehouse.Available"], Quantity), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
   select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, Status, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
 write.csv(inventory_update, file = paste0("../NetSuite/IA-Richmond-", format(Sys.Date(), "%Y%m%d"), ".csv"), row.names = F, na = "")
 ## if there are unsuccessful Clover SO upload due to NS qty=0 
 SO_error <- read.csv("../Clover/results.csv", as.is = T) %>% group_by(Item.SKU) %>% summarise(Qty = sum(Quantity)) %>% as.data.frame() %>% `row.names<-`(.[, "Item.SKU"])
-clover_item <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
+clover_item <- read_xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items") %>% filter(Name %in% netsuite_item$Name) %>% mutate(Quantity = ifelse(Quantity < 0, 0, Quantity))
 inventory_update <- clover_item %>% mutate(Status = "Good", Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = Name, ADJUST.QTY.BY = ifelse(Name %in% netsuite_item_R$Name, Quantity - netsuite_item_R[Name, "Warehouse.On.Hand"], Quantity), ADJUST.QTY.BY = ifelse((ITEM %in% rownames(SO_error)) & (netsuite_item_R[Name, "Warehouse.On.Hand"] < SO_error[ITEM, "Qty"]), ADJUST.QTY.BY + SO_error[ITEM, "Qty"] - netsuite_item_R[Name, "Warehouse.On.Hand"], ADJUST.QTY.BY), Reason.Code = "CC", MEMO = "Clover Inventory Update", WAREHOUSE = "WH-RICHMOND", External.ID = paste0("IAR-", format(Sys.Date(), "%y%m%d"), "-2")) %>%
   select(Date, ITEM, ADJUST.QTY.BY, Reason.Code, Status, MEMO, WAREHOUSE, External.ID) %>% filter(ADJUST.QTY.BY != 0)
 colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
@@ -134,8 +137,8 @@ size <- c("2T", "3T", "4T", "5T", "6Y", "OS", "24", "25", "26", "27", "28", "29"
 n <- 2       # Qty per SKU to stock at Richmond
 n1 <- 2   # Qty for SKUs in cat & size to refill
 n_S <- 8 # min Qty in stock at Surrey to request
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(.[, "Name"])
+clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- wb_to_df(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(.[, "Name"])
 # order <- data.frame(StoreCode = "WH-JJ", ItemNumber=(clover_item %>% filter(Quantity < n & cat %in% request))$Name, Qty = n - clover_item[(clover_item %>% filter(Quantity < n & cat %in% request))$Name, "Quantity"], LocationName = "BIN", UnitCost = "", ReasonCode = "RWT", Memo = "Richmond Transfer to Miranda", UploadRule = "D", AdjAccntName = "", TxnDate = "", ItemIdentifierCode = "", ImportError = "")
 # order <- order %>% filter(xoro[order$ItemNumber, "ATS"] > n_xoro) %>% filter(Qty > 0) %>% mutate(cat = gsub("-.*", "", ItemNumber), size = gsub("\\w+-\\w+-", "", ItemNumber)) %>% arrange(cat, size) %>% select(-c("cat", "size"))
 order <- data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = season, FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Richmond Refill", ORDER.PLACED.BY = "Gloria Li", ITEM = (clover_item %>% filter(Quantity < n))$Name) %>% 
@@ -146,10 +149,10 @@ write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), 
 # upload to NS & email Shikshit
 
 # ---------------- Check and update AMZPrep shipment orders ---------------
-synced <- openxlsx::read.xlsx("../AMZPrep/SyncedOrder.xlsx", sheet = 1)
-shipped <- openxlsx::read.xlsx("../AMZPrep/ShippedOrder.xlsx", sheet = 1)
-records <- openxlsx::loadWorkbook("../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx")
-records_AMZPrep <- readWorkbook(records, "Shipments", detectDates = T) %>% mutate(eShipper.Status = ifelse(Order.ID %in% synced$Extra.Note.1, "Synced", ifelse(Order.ID %in% shipped$Extra.Note.1, "Shipped", eShipper.Status)))
+synced <- read_xlsx("../AMZPrep/SyncedOrder.xlsx", sheet = 1)
+shipped <- read_xlsx("../AMZPrep/ShippedOrder.xlsx", sheet = 1)
+records <- wb_load("../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx")
+records_AMZPrep <- wb_to_df(records, "Shipments", detectDates = T) %>% mutate(eShipper.Status = ifelse(Order.ID %in% synced$Extra.Note.1, "Synced", ifelse(Order.ID %in% shipped$Extra.Note.1, "Shipped", eShipper.Status)))
 new_synced <- synced %>% filter(!(Extra.Note.1 %in% records_AMZPrep$Order.ID)) %>% 
   mutate(Date = gsub(" .*", "", Shipment.Order.Date), Order.ID = Extra.Note.1, Shipped.from.eShipper = "Whole", Province = `Billing.State.Code/Region`, Total.Qty = Total.Quantity, eShipper.Qty = Total.Quantity, Auto.FR = "Y", Shipping.Required = ifelse(Shipping.Service == "Cheapest Service", "", "Express"), FR.Created = "Y", eShipper.Status = "Synced", Items = ifelse(Total.Quantity == 1, SKU, "")) %>%
   select(Date:Items) %>% distinct(Order.ID, .keep_all = T)
@@ -160,7 +163,7 @@ records_AMZPrep <- rbind(records_AMZPrep, new_synced, new_shipped)
 records_AMZPrep <- records_AMZPrep %>% rename_with(~ gsub("\\.", " ", colnames(records_AMZPrep)))
 deleteData(records, sheet = "Shipments", cols = 1:ncol(records_AMZPrep), rows = 1:nrow(records_AMZPrep), gridExpand = T)
 writeData(records, sheet = "Shipments", records_AMZPrep)
-openxlsx::saveWorkbook(records, file = "../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx", overwrite = T)
+wb_save(records, file = "../../TWK Order Process/01 - shipping tracking/3-AMZPrep Order Tracking - 20251223.xlsx", overwrite = T)
 duplicated <- rbind(synced, shipped) %>% mutate(SO = gsub("-.*", "", Order.Code), FR = gsub(".*-", "", Order.Code)) %>% group_by(SO) %>% filter(n_distinct(FR) > 1) %>% ungroup() %>% 
   select(Order.Code:Status) %>% distinct(Order.Code, .keep_all = T) %>% arrange(Order.Code)
 
@@ -168,7 +171,7 @@ duplicated <- rbind(synced, shipped) %>% mutate(SO = gsub("-.*", "", Order.Code)
 netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T)
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_A <- netsuite_item %>% filter(Inventory.Warehouse == "AMZPrep-CA") %>% `row.names<-`(.[, "Name"])
-AMZPrep_inventory <- openxlsx::read.xlsx(list.files(path = "../AMZPrep/", paste0("inventory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = 1) 
+AMZPrep_inventory <- read_xlsx(list.files(path = "../AMZPrep/", paste0("inventory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = 1) 
 diff <- AMZPrep_inventory %>% mutate(NS = ifelse(SKU %in% netsuite_item_A$Name, netsuite_item_A[SKU, "Warehouse.Available"], 0), diff = NS - as.numeric(Current.ATP)) %>% filter(diff != 0) %>% select(SKU, Current.ATP, NS, diff)
 
 # ---------------- Adjust Clover Inventory: at request --------------------
@@ -176,12 +179,12 @@ diff <- AMZPrep_inventory %>% mutate(NS = ifelse(SKU %in% netsuite_item_A$Name, 
 library(dplyr)
 library(openxlsx)
 adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08282025.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- readWorkbook(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
+clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- wb_to_df(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
 clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
 deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
 writeData(clover, sheet = "Items", clover_item)
-openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+wb_save(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
 
 # -------- Analysis: monthly --------------------
@@ -190,7 +193,7 @@ qty_offline <- 1     # Qty to move to offline sales
 month <- format(Sys.Date(), "%m")
 if(month %in% c("09", "10", "11", "12", "01", "02")){in_season <- "F"}else(in_season <- "S")
 RawData <- list.files(path = "../FBArefill/Raw Data File/", pattern = "All Marketplace by", full.names = T)
-mastersku <- openxlsx::read.xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
+mastersku <- read_xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
 mastersku_adjust <- mastersku %>% filter(!duplicated(Adjust.SKU)) %>% `row.names<-`(.[, "Adjust.SKU"])
 netsuite_item_S <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% filter(Inventory.Warehouse == "WH-SURREY") %>% 
   mutate(Name = Name, Seasons = ifelse(Name %in% mastersku$MSKU, mastersku[Name, "Seasons.SKU"], mastersku_adjust[Name, "Seasons.SKU"]), SPU = gsub("(\\w+-\\w+)-.*", "\\1", Name)) %>% `row.names<-`(.[, "Name"])
@@ -199,7 +202,7 @@ monR_last_yr <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRat
 # sheets <- getSheetNames(mr)
 # mr_long <- data.frame()
 # for(sheet in sheets){
-#   mr_long_i <- openxlsx::read.xlsx(mr, sheet = sheet)
+#   mr_long_i <- read_xlsx(mr, sheet = sheet)
 #   mr_long <- rbind(mr_long, mr_long_i)
 # }
 # mr_short <- mr_long %>% mutate(month = paste0("Month", sprintf("%02d", month))) %>% pivot_wider(id_cols = c(channel, category, year, annual_sales), names_from = month, values_from = monthly_ratio)
@@ -209,7 +212,7 @@ monR_last_yr <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRat
 sheets <- grep("-WK", getSheetNames(RawData), value = T)
 inventory <- data.frame()
 for(sheet in sheets){
-  inventory_i <- openxlsx::read.xlsx(RawData, sheet = sheet, startRow = 2)
+  inventory_i <- read_xlsx(RawData, sheet = sheet, startRow = 2)
   inventory <- rbind(inventory, inventory_i)
 }
 inventory[is.na(inventory)] <- 0
@@ -221,11 +224,11 @@ if(month == "01"){columns <- c(1:12, 27:38)}else{columns <- c(1:12, 14:(as.numer
 sales_cat_last12month <- data.frame()
 sales_SKU_last12month <- data.frame()
 for(sheet in sheets){
-  sales_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) 
+  sales_last12month_i <- read_xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) 
   if(sum(grepl("janandjul.com", sales_last12month_i[[1]]))){
     sales_cat_last12month_i <- sales_last12month_i %>% filter(.[[1]] == "All Marketplaces") %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
     sales_cat_last12month <- rbind(sales_cat_last12month, sales_cat_last12month_i)
-    sales_SKU_last12month_i <- openxlsx::read.xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) %>% 
+    sales_SKU_last12month_i <- read_xlsx(RawData, sheet = sheet, cols = columns, startRow = 2) %>% 
       filter(!(Sales.Channel %in% c("Summary", "Sales Channel", "All Marketplaces"))) %>% mutate_all(~ replace(., is.na(.), 0)) %>% rename_with(~ gsub("20", "Total.20", gsub("_x000D_.Total", "", .x)))
     sales_SKU_last12month <- rbind(sales_SKU_last12month, sales_SKU_last12month_i)
   }
@@ -245,14 +248,14 @@ if(month %in% c("01", "02")){
 write.csv(monR, file = paste0("../Analysis/MonthlyRatio_", Sys.Date(), ".csv"), row.names = F)
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 ## SKUs to inactive
-clover <- openxlsx::read.xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items")  %>% filter(!is.na(Name)) %>% `row.names<-`(.[, "Name"])
+clover <- read_xlsx(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = "Items")  %>% filter(!is.na(Name)) %>% `row.names<-`(.[, "Name"])
 inventory_s <- inventory %>% count(Adjust_MSKU, wt = Inv_Total_End.WK) %>% `row.names<-`(.[, "Adjust_MSKU"])
 qty0 <- mastersku %>% select(MSKU.Status, Seasons.SKU, MSKU) %>% mutate(MSKU = MSKU, Inv_clover = clover[MSKU, "Quantity"], Inv_Total_EndWK = inventory_s[MSKU, "n"]) %>% 
   filter(!grepl(new_season, Seasons.SKU) & MSKU.Status == "Active" & Inv_clover == 0 & Inv_Total_EndWK == 0)
 write.csv(qty0, file = paste0("../Analysis/discontinued_qty0_", Sys.Date(), ".csv"), row.names = F, na = "")
 # copy to TWK Analysis\0 - Analysis to Share - Sales and Inventory\
 ## Suggested deals for the website
-discount_method <- openxlsx::read.xlsx("../Analysis/JJ_discount_method.xlsx", sheet = 1, startRow = 2, rowNames = T)
+discount_method <- read_xlsx("../Analysis/JJ_discount_method.xlsx", sheet = 1, startRow = 2, rowNames = T)
 if(month == "01"){last3m <- c("Month11", "Month12", "Month01")}else if(month %in% c("02", "03")){last3m <- sprintf("Month%02d", c(1:(as.numeric(month)-1), (as.numeric(month)-3+12):12))}else{last3m <- sprintf("Month%02d", c((as.numeric(month)-3):(as.numeric(month)-1)))}
 monR <- monR %>% mutate(T.last3m = rowSums(across(all_of(last3m)))) %>% `row.names<-`(.[, "Category"])
 inventory_SPU <- inventory %>% mutate(SPU = gsub("(\\w+-\\w+)-.*", "\\1", Adjust_MSKU)) %>% group_by(SPU) %>% summarise(qty_SPU = sum(Inv_Total_End.WK, na.rm = T), qty_WH = sum(Inv_WH.Surrey, na.rm = T), qty_AMZ = qty_SPU - qty_WH) %>% as.data.frame() %>% `row.names<-`(.[, "SPU"])
@@ -307,13 +310,13 @@ woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-pr
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
 price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK"), Price = c(5, 10, 15, 20, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30))) %>% `row.names<-`(toupper(.[, "cat"])) 
-mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
-clover <- openxlsx::loadWorkbook(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- openxlsx::readWorkbook(clover, "Items") %>% filter(!is.na(Name), !duplicated(Name)) %>% `row.names<-`(.[, "Name"]) 
+mastersku <- read_xlsx(rownames(file.info(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
+clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
+clover_item <- openxlsx::wb_to_df(clover, "Items") %>% filter(!is.na(Name), !duplicated(Name)) %>% `row.names<-`(.[, "Name"]) 
 #category_exclude <- c("FVMU", "PJWU","PLAU", "PTAU", "STORE", "TPLU", "TPSU", "TSWU", "TTLU", "TTSU", "WJAU", "WPSU", "XBMU")
 category_exclude <- c("")
 clover_item_upload <- data.frame(Clover.ID = "", Name = mastersku[mastersku$MSKU.Status == "Active", "MSKU"]) %>% filter(!is.na(Name)) %>% 
-  mutate(cat = mastersku[Name, "Category.SKU"], Alternate.Name = woo[Name, "Name"], Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Price.Unit = NA, Tax.Rates = ifelse(cat %in% PST, "GST+PST", "GST"), Cost = 0, Product.Code = gsub("/.*", "", mastersku[Name, "UPC.Active"]), SKU = Name, Modifier.Groups = NA, Quantity = ifelse(Name %in% clover_item$Name, clover_item[Name, "Quantity"], 0), Printer.Labels = NA, Hidden = "No", Non.revenue.item = "No") %>%
+  mutate(cat = mastersku[Name, "Category.SKU"], Alternate.Name = woo[Name, "Name"], Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Price.Unit = NA, Tax.Rates = ifelse(cat %in% PST, "GST+PST", "GST"), Cost = 0, Product.Code = gsub("[ /|].*", "", mastersku[Name, "UPC.Active"]), SKU = Name, Modifier.Groups = NA, Quantity = ifelse(Name %in% clover_item$Name, clover_item[Name, "Quantity"], 0), Printer.Labels = NA, Hidden = "No", Non.revenue.item = "No") %>%
   filter(!(cat %in% category_exclude)) %>% arrange(cat, Name)
 clover_item_upload <- clover_item_upload %>% mutate(Price = ifelse(grepl("^SS", Name), 10, Price))
 clover_item_upload <- clover_item_upload %>% mutate(Product.Code = ifelse(grepl("^M", Name), gsub("/.*", "", mastersku[gsub("^M", "", Name), "UPC.Active"]), Product.Code))
@@ -325,7 +328,7 @@ deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item)+10, rows = 1:nrow
 writeData(clover, sheet = "Items", clover_item_upload)
 deleteData(clover, sheet = "Categories", cols = 1:1000, rows = 1:1000, gridExpand = T)
 writeData(clover, sheet = "Categories", clover_cat_upload, colNames = F)
-openxlsx::saveWorkbook(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+wb_save(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
 
 # -------- Prepare to generate barcode image: at request ------------
@@ -334,7 +337,7 @@ library(openxlsx)
 library(stringr)
 season <- "2025SS"
 startRow <- 9
-mastersku <- openxlsx::read.xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"]) 
+mastersku <- read_xlsx(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = T), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"]) 
 qty0 <- data.frame()
 skus <- c()
 for(i in c(346, 368, 387:403)){
@@ -343,7 +346,7 @@ for(i in c(346, 368, 387:403)){
   print(POn)
   file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(POn, ".*.xlsx"), full.names = T, recursive = T)
   for(f in 1:length(file)){
-    barcode <- openxlsx::read.xlsx(file[f], sheet = 1, startRow = startRow) %>% select(SKU, Design.Version, TOTAL.ORDER) %>% 
+    barcode <- read_xlsx(file[f], sheet = 1, startRow = startRow) %>% select(SKU, Design.Version, TOTAL.ORDER) %>% 
       mutate(SKU = str_trim(SKU), Category = mastersku[SKU, "Category.SKU"], Print.English = mastersku[SKU, "Print.Name"], Print.Chinese = mastersku[SKU, "Print.Chinese"], Size = mastersku[SKU, "Size"], UPC.Active = gsub("/.*", "", mastersku[SKU, "UPC.Active"]), Image = "") %>%
       filter(SKU != "", !is.na(SKU))
     skus <- c(skus, barcode[barcode$TOTAL.ORDER != 0, "SKU"])
@@ -383,7 +386,7 @@ write.csv(checklist, "../PO/order/checklist.csv", quote = F, row.names = F)
 # ------------ Prep for 3PL CA East -------------------
 East <- c("MB", "ON", "QC", "NB", "NS", "NL", "PE")
 #cat <- c('AJP', 'AWP', 'BSL', 'BST', 'FHA', 'FMG', 'HBU', 'HLH', 'ICP', 'IPC', 'IPS', 'ISJ', 'KHM', 'MBH', 'MKMT', 'MWBF', 'MWBS', 'MWPS', 'PWJ', 'SKB-INSOL', 'UST')
-mastersku <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
+mastersku <- read_xlsx(rownames(file.info(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T) %>% `row.names<-`(.[, "MSKU"])
 JJ_orders <- read.csv("../woo/orders-20241001-20250131.csv", as.is = T) %>% filter(Order.Status == "Completed", Country.Code..Shipping. != "", SKU != "") %>% mutate(Category = ifelse(SKU %in% row.names(mastersku), mastersku[SKU, "Category.SKU"], gsub("-.*", "", SKU)), Country = Country.Code..Shipping., State = State.Code..Shipping., Qty = Quantity....Refund.) 
 JJ_orders_CA <- JJ_orders %>% group_by(Category, Country) %>% summarise(Quantity = sum(Qty)) %>% group_by(Category) %>% mutate(Total_qty = sum(Quantity), Proportion = round(Quantity/Total_qty, 2)) %>% filter(Country == "CA")
 JJ_orders_East <- JJ_orders %>% filter(Country == "CA") %>% mutate(Region = ifelse(State %in% East, "East", "West"))%>% group_by(Category, Region) %>% summarise(Quantity = sum(Qty)) %>% group_by(Category) %>% mutate(Total_qty = sum(Quantity), Proportion = round(Quantity/Total_qty, 2)) %>% filter(Region == "East") %>% as.data.frame() %>% `row.names<-`(toupper(.[, "Category"])) 
@@ -402,7 +405,7 @@ for(f in folder){
   print(paste(ID, category, vendor, memo))
   file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
   if(length(file) != 1){print(paste(ID, "INPUT FILE ERROR:", length(file), "files found")); next}
-  PO <- openxlsx::read.xlsx(file, sheet = 1, startRow = 8) 
+  PO <- read_xlsx(file, sheet = 1, startRow = 8) 
   if(sum(grepl("加拿大总数量", colnames(PO))) == 1){
     PO_CA <- PO %>% select("产品编号", "加拿大总数量") %>% filter(grepl("-.*", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- paste((PO_CA %>% distinct(cat))$cat, collapse = " ")
@@ -513,7 +516,7 @@ for(f in file){
   memo <- gsub(paste0(".*", ID, " *\\- *"), "", gsub(paste0("\\/", ID, "-.*\\.xlsx"), "", f))
   for(s in sheets){
     print(c(f, s))
-    PO <- openxlsx::read.xlsx(f, sheet = s, startRow = 8)
+    PO <- read_xlsx(f, sheet = s, startRow = 8)
     ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
     PO_WS <- PO %>% select("产品编号", "订单.总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- c(CAT, paste((PO_WS %>% distinct(cat))$cat, collapse = " "))
@@ -532,7 +535,7 @@ write_excel_csv(PO_NS, file = paste0(gsub("(.*\\/).*", "\\1", f), "NS_PO_", ID, 
 # ------------ upload CEFA POs -------------------
 ID <- "CEFA26S"; season <- "26S"; ReceiveDate <- "3/20/2026"
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T)
-PO <- openxlsx::read.xlsx(rownames(file.info(list.files(path = "../PO/order/CEFA/", pattern = ".xlsx", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1, startRow = 2) %>% 
+PO <- read_xlsx(rownames(file.info(list.files(path = "../PO/order/CEFA/", pattern = ".xlsx", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = 1, startRow = 2) %>% 
   filter(grepl("-.*-", SKU.Number), !is.na(Quantity), Quantity > 0) %>% mutate(cat = gsub("-.*", "", SKU.Number))
 CAT <- paste((PO %>% distinct(cat))$cat, collapse = " ")
 new_SKU <- PO %>% filter(!(SKU.Number %in% netsuite_item$Name)) %>% select(SKU.Number, Quantity)
@@ -543,23 +546,23 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "26S"; warehouse <- "AWD-US"; PO_suffix <- "-CA"
-RefNo <- "26SSUS7"; ShippingDate <- "1/9/2026"; ReceiveDate <- "2/4/2026"; AMZ.Shipment.ID <- "STAR-SPKGW6D3XRPEU"
+season <- "26S"; warehouse <- "FBA-JP"; PO_suffix <- "-JP"
+RefNo <- "26SSJP1"; ShippingDate <- "2/3/2026"; ReceiveDate <- "3/3/2026"; AMZ.Shipment.ID <- "FBA15G629D5M"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
-Weight_manual <- openxlsx::read.xlsx("../PO/shipment/UnitWeight_ManualCheck.xlsx", sheet = 1) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"]))
-Weight_master <- openxlsx::read.xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T) %>% filter(!is.na(Size)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample.Weight(g)`, 0))
+Weight_manual <- read_xlsx("../PO/shipment/UnitWeight_ManualCheck.xlsx", sheet = 1) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"]))
+Weight_master <- read_xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T) %>% filter(!is.na(Size)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample.Weight(g)`, 0))
 Unit_weight <- rbind(Weight_manual %>% select(Category, Size, Unit.Weight), Weight_master %>% select(Category, Size, Unit.Weight) %>% filter(!(rownames(Weight_master) %in% rownames(Weight_manual))))
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- getSheetNames(shipment_in)[]
-summary <- openxlsx::read.xlsx(shipment_in, sheet = 1, fillMergedCells = T)
+summary <- read_xlsx(shipment_in, sheet = 1, fillMergedCells = T)
 shipment <- data.frame(); attachment <- data.frame(); Nbox <- 0
 for(s in 2:length(sheets)){
   sheet <- sheets[s]
   #PO_suffix <- ifelse(s%in% c(7, 8), "-CN", "-CA")
-  shipment_i <- openxlsx::read.xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
+  shipment_i <- read_xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
     select(1:PER.CTN) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down") %>% mutate(`PO.#` = str_trim(`PO.#`), Unit.weight = ifelse(as.numeric(`Unit.Weight(g)`) < 10, round(as.numeric(`Unit.Weight(g)`)*1000, 0), round(as.numeric(`Unit.Weight(g)`), 0))) 
   if(sum(grepl("CTN.NO", colnames(shipment_i))) == 1){
     print(paste(1, sheet))
@@ -582,8 +585,6 @@ for(s in 2:length(sheets)){
   attachment <- rbind(attachment, data.frame(Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), GR.Weight = c(shipment_o$GR.Weight, ""), Unit.Weight.woo = c(shipment_o$Unit.Weight.woo, ""), Unit.Weight.Shipment = c(shipment_o$Unit.Weight.Shipment, ""), EST.Weight.woo = c(shipment_o$EST.Weight.woo, ""), EST.Weight.Shipment = c(shipment_o$EST.Weight.Shipment, ""), Notes = ""))
 }
 print(paste0("Qty: ", sum(shipment$QUANTITY), "; #Boxes: ", Nbox))
-if(sum(shipment$QUANTITY) == summary[nrow(summary), "QTY"]){print(paste0("Total QTY matches: ", sum(shipment$QUANTITY)))}else{print(paste("Total QTY NOT matching:", sum(shipment$QUANTITY), summary[nrow(summary), "QTY"]))}
-if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
 View(summary)
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
@@ -630,11 +631,11 @@ POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"]
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- getSheetNames(shipment_in)[]
-summary <- openxlsx::read.xlsx(shipment_in, sheet = 1, fillMergedCells = T)
+summary <- read_xlsx(shipment_in, sheet = 1, fillMergedCells = T)
 shipment <- data.frame(); TO <- data.frame(); attachment <- data.frame(); Nbox <- 0
 for(s in 2:length(sheets)){
   sheet <- sheets[s]
-  shipment_i <- openxlsx::read.xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
+  shipment_i <- read_xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
     select(1:Season) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down")
   if(sum(grepl("CTN.NO", colnames(shipment_i))) == 1){
     print(paste(1, sheet))
@@ -717,7 +718,7 @@ write.csv(TO_receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS
 # ------------ check shipment Qty -------------------
 RefNo <- "25FWCA7"
 attachment <- read.csv(list.files(path = "../PO/shipment/", pattern = paste0(RefNo, "_receiving_by_box.csv"), recursive = T, full.names = T), as.is = T) %>% filter(SKU!="") %>% `row.names<-`(paste0(.[, "SKU"], "_", .[, "Box.Number"]))
-shipment_weight <- openxlsx::read.xlsx(list.files(path = "../PO/shipment/", pattern = paste0("BoxWeight_", RefNo, ".xlsx"), recursive = T, full.names = T)) %>% 
+shipment_weight <- read_xlsx(list.files(path = "../PO/shipment/", pattern = paste0("BoxWeight_", RefNo, ".xlsx"), recursive = T, full.names = T)) %>% 
   mutate(Total.Weight = `Total.Weight.(g)`/1000, Unit.Weight.woo = attachment[paste0(SKU, "_", Box.Number), "Unit.Weight.woo"], Unit.Weight.Shipment = attachment[paste0(SKU, "_", Box.Number), "Unit.Weight.Shipment"], EST.Weight.woo = attachment[paste0(SKU, "_", Box.Number), "EST.Weight.woo"], EST.Weight.Shipment = attachment[paste0(SKU, "_", Box.Number), "EST.Weight.Shipment"], Diff.woo = Total.Weight - EST.Weight.woo, Diff.Shipment = Total.Weight - EST.Weight.Shipment)
 discrepancy <- shipment_weight %>% filter(abs(Diff.woo) > Unit.Weight.woo/1000 & abs(Diff.Shipment) > Unit.Weight.Shipment/1000)
 View(discrepancy)
