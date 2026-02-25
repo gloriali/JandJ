@@ -383,6 +383,20 @@ folder <- stri_remove_empty(gsub(" *- *sent", "", gsub(paste0("\\.\\.\\/PO\\/ord
 checklist <- stri_split_regex(folder, pattern = " *- *", n = 3, simplify = T) %>% as.data.frame() %>% mutate(V3 = gsub(" *-.*", "", V3))
 write.csv(checklist, "../PO/order/checklist.csv", quote = F, row.names = F)
 
+# ------------ New SKUs for 3PL CA East -------------------
+season <- "26S"
+AMZPrep <- read_xlsx(list.files(path = "../AMZPrep/", pattern = paste0("inventory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T), sheet = 1)
+woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
+price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
+mastersku <- read_xlsx(rownames(file.info(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T, skip_empty_cols = T) %>% `row.names<-`(.[, "MSKU"])
+dim <- read_xlsx(list.files(path = "../../Derek Song's files - TWK Listings/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fill_merged_cells = T, check_names = T) %>% fill(Category, .direction = "down") %>% 
+  mutate(Category = gsub("\\(.*", "", Category)) %>% filter(!is.na(Size)) %>% separate_longer_delim(Category, delim = "/") %>% separate_longer_delim(Size, delim = "/") %>% `row.names<-`(paste0(trimws(.[, "Category"]), "_", trimws(.[, "Size"])))
+new_SKU <- data.frame(SKU = (mastersku %>% filter(Seasons == season))$MSKU) %>% 
+  mutate(Description = mastersku[SKU, "Item Name"], cat = trimws(mastersku[SKU, "Category SKU"]), Cost = ifelse(SKU %in% woo$SKU, woo[SKU, "Sale.price"], price[cat, "Price"]), min.Qty = 0, UPC = gsub("\\|.*", "", mastersku[SKU, "UPC Active"]), cat_size = paste0(trimws(mastersku[SKU, "Category SKU"]), "_", trimws(mastersku[SKU, "Size"])), cat_size = ifelse(cat_size %in% rownames(dim), cat_size, gsub("[A-Z]$", "", cat_size)), length = round(dim[cat_size, "Length.in."], 2), width = round(dim[cat_size, "Width.in."], 2), height = round(dim[cat_size, "Height.in."], 2), weight = round(dim[cat_size, "Weight.lb..pc"], 2)) %>% 
+  select(-cat, -cat_size) %>% filter(!(SKU %in% AMZPrep$SKU))
+write.csv(new_SKU, file = paste0("../AMZPrep/new_SKU_", Sys.Date(), ".csv"), row.names = F, na = "")
+
 # ------------ Prep for 3PL CA East -------------------
 East <- c("MB", "ON", "QC", "NB", "NS", "NL", "PE")
 #cat <- c('AJP', 'AWP', 'BSL', 'BST', 'FHA', 'FMG', 'HBU', 'HLH', 'ICP', 'IPC', 'IPS', 'ISJ', 'KHM', 'MBH', 'MKMT', 'MWBF', 'MWBS', 'MWPS', 'PWJ', 'SKB-INSOL', 'UST')
