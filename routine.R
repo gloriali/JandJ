@@ -316,7 +316,6 @@ clover_item_upload <- data.frame(Clover.ID = "", Name = (mastersku %>% filter(`M
 clover_cat_upload <- data.frame(Category.ID = "", Category.Name = clover_item_upload$Categories, Subcategory.Name = "", Item.Sort.Order = clover_item_upload$Name)
 clover_cat_upload$Category.Name[duplicated(clover_cat_upload$Category.Name)] <- ""
 clover_cat_upload <- clover_cat_upload %>% rename_with(~ gsub("\\.", " ", colnames(clover_cat_upload)))
-clover_item_upload <- clover_item_upload
 clover_update <- wb_workbook()
 for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
 clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item_upload) |> wb_clean_sheet(sheet = "Categories") |> wb_add_data(sheet = "Categories", x = clover_cat_upload)
