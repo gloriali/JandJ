@@ -546,12 +546,12 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
 season <- "26S"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26SSCA7"; ShippingDate <- "2/24/2026"; ReceiveDate <- "3/24/2026"; AMZ.Shipment.ID <- ""
+RefNo <- "26SSTW1"; ShippingDate <- "2/24/2026"; ReceiveDate <- "3/24/2026"; AMZ.Shipment.ID <- ""
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% filter(Status != "Closed") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
 Weight_manual <- read_xlsx("../PO/shipment/UnitWeight_ManualCheck.xlsx", sheet = 1) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% rename_with(~ gsub("\\ ", ".", .))
-Weight_master <- read_xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T) %>% filter(!is.na(Size)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample Weight(g)`, 0))
+Weight_master <- read_xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T, check_names = T) %>% filter(!is.na(Size), !is.na(Category)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample.Weight.g.`, 0))
 Unit_weight <- rbind(Weight_manual %>% select(Category, Size, Unit.Weight), Weight_master %>% select(Category, Size, Unit.Weight) %>% filter(!(rownames(Weight_master) %in% rownames(Weight_manual))))
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
