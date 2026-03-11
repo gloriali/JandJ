@@ -8,6 +8,7 @@ library(ggplot2)
 library(tidyr)
 library(readr)
 library(janitor)
+library(fuzzyjoin)
 options("openxlsx2.na" = "")
 
 # input: NS > Items > Export all warehouses
@@ -43,6 +44,7 @@ write.csv(netsuite_so, file = paste0("../Clover/SO-clover-", format(Sys.Date(), 
 # upload to NS
 update_INV <- T
 adjust_inventory <- clover_so %>% filter(Order.Employee.Name == "Garman") %>% group_by(Item.SKU) %>% summarise(Quantity = n()) %>% as.data.frame() %>% `row.names<-`(.[, "Item.SKU"])
+clearance <- read.csv("../Clover/ShopClearance.csv", as.is = T)
 price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
 price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "MISC25", "MISC30", "MISC35", "MISC45", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK", "MAJC"), Price = c(5, 10, 15, 20, 25, 30, 35, 45, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30, 99.99))) %>% `row.names<-`(toupper(.[, "cat"])) 
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T)) |> wb_remove_worksheet(sheet = 1) 
@@ -53,7 +55,7 @@ if(update_INV){
   }else{
   clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
 }
-clover_item <- clover_item %>% mutate(Price = ifelse(grepl("^SS", Name), 10, Price))
+clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item)))
 #clover_item <- clover_item %>% mutate(Price = ifelse(Name %in% sales$SKU, sales[Name, "Sale.price"], Price)) 
 clover_update <- wb_workbook()
 for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
@@ -507,19 +509,18 @@ print(paste("Total No. of items: ", nrow(PO_NS), items, "; Total Qty: ", sum(PO_
 write_excel_csv(PO_NS, file = paste0("../PO/order/", season, "/NS_PO_regular_", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
 
 # ------------ upload wholesaler POs: CZ-Mylerie, CA-Clement, FR-Petits, US-BabiesR -------------------
-ID <- "P553"; season <- "26S"; type <- "CZ-Mylerie"; warehouse <- "WH-CHINA"
+ID <- "P668"; season <- "26F"; type <- "CA-Clement"; warehouse <- "WH-SURREY"
 file <- list.files(path = paste0("../PO/order/", season, "/"), pattern = paste0(ID, ".*.xlsx"), full.names = TRUE, recursive = T)
 PO_NS <- data.frame(); total <- 0; items <- 0; CAT <- c()
 for(f in file){
   sheets <- getSheetNames(f)[getSheetNames(f) != "Export Summary"]
-  memo <- gsub(paste0(".*", ID, " *\\- *"), "", gsub(paste0("\\/", ID, "-.*\\.xlsx"), "", f))
   for(s in sheets){
     print(c(f, s))
-    PO <- read_xlsx(f, sheet = s, startRow = 8)
-    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("中国总数量", colnames(PO)))+1]), "%Y.%m.%d") + 40, "%m/%d/%Y")
-    PO_WS <- PO %>% select("产品编号", "订单.总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
+    PO <- read_xlsx(f, sheet = s, startRow = 8, check_names = T)
+    ReceiveDate <- format(as.Date(gsub("出货日期.ShipDate.", "", colnames(PO)[which(grepl("订单..总数量", colnames(PO)))+2]), "%Y.%m.%d") + 40, "%m/%d/%Y")
+    PO_WS <- PO %>% select("产品编号", "订单..总数量") %>% filter(grepl("-.*-", 产品编号)) %>% mutate(cat = gsub("-.*", "", 产品编号))
     CAT <- c(CAT, paste((PO_WS %>% distinct(cat))$cat, collapse = " "))
-    PO_WS_NS <- PO_WS %>% mutate(PO.TYPE = type, CATEGORY = "", SEASON = season, REF.NO = ID, WAREHOUSE = warehouse, VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = memo, ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(订单.总数量), 0, 订单.总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
+    PO_WS_NS <- PO_WS %>% mutate(PO.TYPE = type, CATEGORY = "", SEASON = season, REF.NO = ID, WAREHOUSE = warehouse, VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste(type, season), ITEM = 产品编号,  QUANTITY = as.numeric(ifelse(is.na(订单..总数量), 0, 订单..总数量)), Tax.Code = "CA-Zero", External.ID = ID) %>% 
       filter(QUANTITY > 0) %>% select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
     total <- total + sum(PO_WS_NS$QUANTITY)
     items <- items + nrow(PO_WS_NS)
