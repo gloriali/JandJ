@@ -152,7 +152,7 @@ clearance <- read.csv("../Clover/ShopClearance.csv", as.is = T)
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- wb_to_df(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(.[, "Name"])
 order <- data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = season, FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Richmond Refill", ORDER.PLACED.BY = "Gloria Li", ITEM = (clover_item %>% filter(grepl(paste(clearance$Item, collapse = "|"), Name)))$Name) %>% 
-  mutate(Seasons = netsuite_item_S[ITEM, "Item.SKU.Seasons"], Quantity = netsuite_item_S[ITEM, "Warehouse.Available"], stock = clover_item[ITEM, "Quantity"]) %>% filter(ITEM %in% netsuite_item_S$Name, Quantity > 0, stock < n) %>% arrange(desc(stock), desc(Quantity)) 
+  mutate(Seasons = netsuite_item_S[ITEM, "Item.SKU.Seasons"], Quantity = netsuite_item_S[ITEM, "Warehouse.Available"], stock = clover_item[ITEM, "Quantity"]) %>% filter(ITEM %in% netsuite_item_S$Name, Quantity > 0, stock < n | Quantity == 1) %>% arrange(desc(stock), desc(Quantity)) 
 order <- order %>% rename_with(~ gsub("\\.", " ", colnames(order))) 
 write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 
