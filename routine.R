@@ -57,7 +57,6 @@ if(update_INV){
   clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
 }
 clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item)))
-#clover_item <- clover_item %>% mutate(Price = ifelse(Name %in% sales$SKU, sales[Name, "Sale.price"], Price)) 
 clover_update <- wb_workbook()
 for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
 clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item) |> wb_add_numfmt(sheet = "Tax Rates", dims = "C2:C3", numfmt = "0%")
@@ -185,14 +184,14 @@ diff <- AMZPrep_inventory %>% mutate(NS = ifelse(SKU %in% netsuite_item_A$Name, 
 # ---------------- Adjust Clover Inventory: at request --------------------
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
-library(openxlsx)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08282025.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
+library(openxlsx2)
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order03112026.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- wb_to_df(clover, "Items") %>% mutate(SKU = SKU, Quantity = ifelse(SKU %in% rownames(adjust_inventory), Quantity + adjust_inventory[SKU, "Quantity"], Quantity))
-clover_item <- clover_item %>% rename_with(~ gsub("\\.", " ", colnames(clover_item)))
-deleteData(clover, sheet = "Items", cols = 1:ncol(clover_item), rows = 1:nrow(clover_item), gridExpand = T)
-writeData(clover, sheet = "Items", clover_item)
-wb_save(clover, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+clover_item <- wb_to_df(clover, "Items", skip_empty_rows = T) %>% mutate(Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity), Quantity = ifelse(Name %in% adjust_inventory$ITEM, Quantity + adjust_inventory[Name, "Quantity"], Quantity))
+clover_update <- wb_workbook()
+for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
+clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item) |> wb_add_numfmt(sheet = "Tax Rates", dims = "C2:C3", numfmt = "0%")
+wb_save(clover_update, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
 # upload to Clover > Inventory
 
 # -------- Analysis: monthly --------------------
