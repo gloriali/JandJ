@@ -56,7 +56,7 @@ if(update_INV){
   }else{
   clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
 }
-clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item)))
+clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item))) %>% distinct(Name, .keep_all = T)
 clover_update <- wb_workbook()
 for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
 clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item) |> wb_add_numfmt(sheet = "Tax Rates", dims = "C2:C3", numfmt = "0%")
@@ -123,7 +123,7 @@ netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"])
 season <- "26S"
 #request <- c("AJA", "AJC", "AJM", "BCV", "BSW", "BSA", "BRC", "BST", "BSL", "BTB", "BTL", "BTT", "BST", "FAN", "FHA", "FJC", "FJM", "FPM", "FMR", "FSM", "FVM", "IHT", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "KEH", "KHB", "KHM", "KHP", "KMN", "KMT", "LAB", "LAN", "LBT", "LBP", "LCP", "LCT", "SKG", "SKB", "SKX", "SMC", "SMF", "SWS", "WJA", "WJT", "WPF", "WPS", "WBF", "WJO", "WPO", "WHO", "WHR", "WBS", "WGF", "WGS", "WMT", "WRM", "WSF", "WSS", "XBK", "XBM", "XLB", "XPC") # categories to restock for FW
-request <- c("WJA", "SWS", "SMC", "SBS", "SMF", "XBM", "XBK", "BRC", "BSL", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HBC", "HBN", "HLC", "HLH", "GUA", "GUX", "GHA", "GHX", "GBX", "PJA", "PJS", "PLA", "PLS", "SLJ", "SLO", "TSA", "TSAV", "TTS", "UGR", "USG", "UT2", "UTG", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST", "AAA", "ACA", "ACB", "AHJ", "ALF") # categories to restock for SS
+request <- c("SLJ", "SLC", "SLM", "SLO", "SUK", "SWS", "SMC", "SBS", "SMF", "XBM", "XBK", "BRC", "BSL", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HBC", "HBN", "HLC", "HLH", "GUA", "GUX", "GHA", "GHX", "GBX", "PJA", "PJS", "PLA", "PLS", "SLJ", "SLO", "TSA", "TSAV", "TTS", "UGR", "USG", "UT2", "UTG", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST", "AAA", "ACA", "ACB", "AHJ", "ALF") # categories to restock for SS
 cat <- c("WJA", "WPF", "WPS", "XBK", "XBM", "XLB", "SWS", "BRC", "BTB", "BTL", "FHA", "IHT", "KHB", "KHP", "WHR")
 size <- c("2T", "3T", "4T", "5T", "6Y", "OS", "24", "25", "26", "27", "28", "29", "8", "9", "10", "11", "12", "13", "L", "XL")
 n <- 2       # Qty per SKU to stock at Richmond
@@ -153,7 +153,7 @@ clover_item <- wb_to_df(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name),
 order <- data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "Surrey-Richmond", SEASON = season, FROM.WAREHOUSE = "WH-SURREY", TO.WAREHOUSE = "WH-RICHMOND", REF.NO = paste0("TO-S2R", format(Sys.Date(), "%y%m%d")), Memo = "Richmond Refill", ORDER.PLACED.BY = "Gloria Li", ITEM = (clover_item %>% filter(grepl(paste(clearance$Item, collapse = "|"), Name)))$Name) %>% 
   mutate(Seasons = netsuite_item_S[ITEM, "Item.SKU.Seasons"], Quantity = netsuite_item_S[ITEM, "Warehouse.Available"], stock = clover_item[ITEM, "Quantity"]) %>% filter(ITEM %in% netsuite_item_S$Name, Quantity > 0, stock < n | Quantity == 1) %>% arrange(desc(stock), desc(Quantity)) 
 order <- order %>% rename_with(~ gsub("\\.", " ", colnames(order))) 
-write.csv(order, file = paste0("../Clover/order", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
+write.csv(order, file = paste0("../Clover/order_clearance", format(Sys.Date(), "%m%d%Y"), ".csv"), row.names = F, na = "")
 
 # ---------------- Check and update AMZPrep shipment orders ---------------
 synced <- read_xlsx("../AMZPrep/SyncedOrder.xlsx", sheet = 1)
