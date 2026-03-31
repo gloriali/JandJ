@@ -313,19 +313,20 @@ write.csv(Sales_Inv_Next4m, file = paste0("../Analysis/Sales_Inv_Prediction_Next
 # download clover inventory: clover_item > Inventory > Items > Export.
 #category_exclude <- c("FVMU", "PJWU","PLAU", "PTAU", "STORE", "TPLU", "TPSU", "TSWU", "TTLU", "TTSU", "WJAU", "WPSU", "XBMU")
 category_exclude <- c("")
+PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "AWWJ", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
 woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 clearance <- read.csv("../Clover/ShopClearance.csv", as.is = T)
 price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Sale.price)) %>% as.data.frame()
 price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "MISC25", "MISC30", "MISC35", "MISC45", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK", "MAJC"), Price = c(5, 10, 15, 20, 25, 30, 35, 45, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30, 99.99))) %>% `row.names<-`(toupper(.[, "cat"])) 
-mastersku <- read_xlsx(rownames(file.info(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T, skip_empty_cols = T) %>% `row.names<-`(.[, "MSKU"])
+mastersku <- read_xlsx(rownames(file.info(list.files(path = "../../TWK 2020 share/", pattern = "1-MasterSKU-All-Product-", full.names = TRUE)) %>% filter(mtime == max(mtime))), sheet = "MasterFile", startRow = 4, fillMergedCells = T, skip_empty_cols = T, check_names = T) %>% `row.names<-`(.[, "MSKU"])
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- wb_to_df(clover, "Items") %>% filter(!is.na(Name), !duplicated(Name)) %>% `row.names<-`(.[, "Name"]) 
 clover_cat <- wb_to_df(clover, "Categories") %>% filter(!is.na(`Category Name`), !duplicated(`Category Name`)) %>% `row.names<-`(.[, "Category Name"]) 
-clover_item_upload <- data.frame(Name = (mastersku %>% filter(`MSKU Status` == "Active"))$MSKU) %>% filter(!is.na(Name)) %>% 
-  mutate(Categories = mastersku[Name, "Category SKU"], Clover.ID = clover_item[Name, "Clover ID"], Alternate.Name = woo[Name, "Name"], Description = NA, Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[Categories, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Price.Unit = NA, Cost = NA, Product.Code = gsub("[ /|].*", "", mastersku[Name, "UPC Active"]), SKU = Name, Quantity = ifelse(Name %in% clover_item$Name, clover_item[Name, "Quantity"], 0), `Hidden?` = "No", `Default tax rates?` = "No", `Non-revenue item?` = "No", Printer.Labels = NA, Modifier.Groups = NA, Tax.Rates = ifelse(Categories %in% PST, "GST+PST", "GST"), Variant.Attribute = NA, Variant.Option = NA) %>%
-  mutate(Product.Code = ifelse(grepl("^M", Name), gsub("/.*", "", mastersku[gsub("^M", "", Name), "UPC Active"]), Product.Code)) %>% arrange(Name) 
-clover_item_upload <- clover_item_upload %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item_upload))) %>% rename_with(~ gsub("\\.", " ", colnames(clover_item_upload)))
+clover_item_upload <- data.frame(Name = (mastersku %>% filter(MSKU.Status == "Active"))$MSKU) %>% filter(!is.na(Name)) %>% 
+  mutate(Categories = mastersku[Name, "Category.SKU"], Clover.ID = clover_item[Name, "Clover ID"], Alternate.Name = woo[Name, "Name"], Description = NA, Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[Categories, "Price"]), Price.Type = ifelse(is.na(Price), "Variable", "Fixed"), Price.Unit = NA, Cost = NA, Product.Code = gsub("[ /|].*", "", mastersku[Name, "UPC.Active"]), SKU = Name, Quantity = ifelse(Name %in% clover_item$Name, clover_item[Name, "Quantity"], 0), `Hidden?` = "No", `Default tax rates?` = "No", `Non-revenue item?` = "No", Printer.Labels = NA, Modifier.Groups = NA, Tax.Rates = ifelse(Categories %in% PST, "GST+PST", "GST"), Variant.Attribute = NA, Variant.Option = NA) %>%
+  mutate(Product.Code = ifelse(grepl("^M", Name), gsub("/.*", "", mastersku[gsub("^M", "", Name), "UPC.Active"]), Product.Code), Product.Code = gsub("\\|.*", "", Product.Code)) %>% arrange(Name) 
+clover_item_upload <- clover_item_upload %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price)) %>% select(all_of(names(clover_item_upload))) %>% distinct(Name, .keep_all = T) %>% rename_with(~ gsub("\\.", " ", colnames(clover_item_upload)))
 clover_cat_upload <- data.frame(Category.Name = clover_item_upload$Categories, Subcategory.Name = "", Item.Sort.Order = clover_item_upload$Name) %>% mutate(Category.ID = clover_cat[Category.Name, "Category ID"])
 clover_cat_upload$Category.Name[duplicated(clover_cat_upload$Category.Name)] <- ""
 clover_cat_upload$Category.ID[duplicated(clover_cat_upload$Category.ID)] <- ""
@@ -564,8 +565,8 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "26S"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26SSTW1"; ShippingDate <- "2/24/2026"; ReceiveDate <- "3/24/2026"; AMZ.Shipment.ID <- ""
+season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
+RefNo <- "26FWCA1"; ShippingDate <- "3/25/2026"; ReceiveDate <- "4/26/2026"; AMZ.Shipment.ID <- ""
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% filter(Status != "Closed") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -641,23 +642,29 @@ write.csv(weight_check, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "We
 
 # ------------ inbound shipment for PO TO combined -------------------
 library(tidyr)
-season <- "25S"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "25SSCA4"; ShippingDate <- "1/26/2025"; ReceiveDate <- "3/10/2025"
+season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
+RefNo <- "26FWCA1"; ShippingDate <- "3/25/2026"; ReceiveDate <- "4/26/2026"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
+Weight_manual <- read_xlsx("../PO/shipment/UnitWeight_ManualCheck.xlsx", sheet = 1) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% rename_with(~ gsub("\\ ", ".", .))
+Weight_master <- read_xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T, check_names = T) %>% filter(!is.na(Size), !is.na(Category)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample.Weight.g.`, 0))
+Unit_weight <- rbind(Weight_manual %>% select(Category, Size, Unit.Weight), Weight_master %>% select(Category, Size, Unit.Weight) %>% filter(!(rownames(Weight_master) %in% rownames(Weight_manual))))
 shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- getSheetNames(shipment_in)[]
 summary <- read_xlsx(shipment_in, sheet = 1, fillMergedCells = T)
+TO_prefix <- "F25"
+TO_Ref <- paste0("TO-C2S", format(as.Date(ShippingDate, "%m/%d/%Y"), "%y%m%d"))
 shipment <- data.frame(); TO <- data.frame(); attachment <- data.frame(); Nbox <- 0
 for(s in 2:length(sheets)){
   sheet <- sheets[s]
-  shipment_i <- read_xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T) %>% 
-    select(1:Season) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down")
+  #PO_suffix <- ifelse(s%in% c(7, 8), "-CN", "-CA")
+  shipment_i <- read_xlsx(shipment_in, sheet = sheet, startRow = 5, fillMergedCells = T, check_names = T) %>% rename_with(~ gsub("PO.*", "PO", .)) %>% mutate(across(where(is.character), trimws)) %>% 
+    select(1:PER.CTN) %>% filter(grepl(".*\\-.*", SKU)) %>% tidyr::fill(1:Season, .direction = "down") %>% mutate(Unit.weight = ifelse(as.numeric(`Unit.Weight.g.`) < 10, round(as.numeric(`Unit.Weight.g.`)*1000, 0), round(as.numeric(`Unit.Weight.g.`), 0))) 
   if(sum(grepl("CTN.NO", colnames(shipment_i))) == 1){
     print(paste(1, sheet))
-    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$`PO.#`, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = as.numeric(shipment_i$QTY.SHIPPED), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
+    shipment_o <- data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i$PO, PO_suffix), BOX.NO = paste0(s, "-", shipment_i$`CTN.NO`), ITEM = shipment_i$SKU, QUANTITY = as.numeric(shipment_i$QTY.SHIPPED), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]), Unit.Weight.Shipment = as.numeric(shipment_i$Unit.weight), Unit.Weight.woo = Unit_weight[gsub("-[A-Z]+-", "_", ITEM), "Unit.Weight"], GR.Weight = round(as.numeric(shipment_i$PER.CTN), 2)) %>% group_by(BOX.NO) %>% mutate(EST.Weight.Shipment = round(sum(QUANTITY*Unit.Weight.Shipment/1000) + 1, 2), EST.Weight.woo = round(sum(QUANTITY*Unit.Weight.woo/1000) + 1, 2))
   }else{
     print(paste(2, sheet))
     colnames(shipment_i) <- c("Start", "End", colnames(shipment_i)[3:length(colnames(shipment_i))])
@@ -665,16 +672,17 @@ for(s in 2:length(sheets)){
     shipment_o <- data.frame()
     for(i in 1:nrow(shipment_i)){
       for(n in shipment_i[i, "Start"]:shipment_i[i, "End"]){
-        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO.#"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = as.numeric(shipment_i[i, "QTY.Per.Box"]), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"])))
+        shipment_o <- rbind(shipment_o, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0(shipment_i[i, "PO"], PO_suffix), BOX.NO = paste0(s, "-", n), ITEM = shipment_i[i, "SKU"], QUANTITY = as.numeric(shipment_i[i, "QTY.Per.Box"]), LOCATION = warehouse) %>% mutate(PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]), Unit.Weight.Shipment = as.numeric(shipment_i[i, "Unit.weight"]), Unit.Weight.woo = Unit_weight[gsub("-[A-Z]+-", "_", ITEM), "Unit.Weight"], GR.Weight = round(as.numeric(shipment_i[i, "PER.CTN"]), 2)))
       }
     }
+    shipment_o <- shipment_o %>% group_by(BOX.NO) %>% mutate(EST.Weight.Shipment = round(sum(QUANTITY*Unit.Weight.Shipment/1000) + 1, 2), EST.Weight.woo = round(sum(QUANTITY*Unit.Weight.woo/1000) + 1, 2))
   }
   Nbox <- Nbox + length(unique(shipment_o$BOX.NO))
   print(paste0("Total Qty ", sum(shipment_o$QUANTITY), "; Total Box# ", length(unique(shipment_o$BOX.NO))))
-  if(grepl("CR", sheets[s])){
-    TO <- rbind(TO, data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "China-Surrey", SEASON = "24F", FROM.WAREHOUSE = "WH-CHINA", TO.WAREHOUSE = "WH-SURREY", REF.NO = paste0("TO-", RefNo), Memo = memo, ORDER.PLACED.BY = "Gloria Li", ITEM = shipment_o$ITEM, Quantity = shipment_o$QUANTITY))
+  if(grepl(TO_prefix, sheets[s])){
+    TO <- rbind(TO, data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), TO.TYPE = "China-Surrey", SEASON = season, FROM.WAREHOUSE = "WH-CHINA", TO.WAREHOUSE = "WH-SURREY", REF.NO = TO_Ref, Memo = RefNo, ORDER.PLACED.BY = "Gloria Li", ITEM = shipment_o$ITEM, Quantity = shipment_o$QUANTITY))
   }else{
-    shipment <- rbind(shipment, shipment_o)
+    shipment <- rbind(shipment, shipment_o %>% select(REF.NO:PO))
   }
   attachment <- rbind(attachment, data.frame(Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), Notes = ""))
 }
@@ -686,9 +694,9 @@ if(nrow(TO)){
 if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
 # check for over-receiving
 if(nrow(TO)){
-  netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% filter(Inventory.Warehouse == unique(TO$FROM.WAREHOUSE)) %>% `row.names<-`(.[, "Name"]) 
+  netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Inventory.Warehouse == unique(TO$FROM.WAREHOUSE)) %>% `row.names<-`(.[, "Name"]) 
   netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
-  TO <- TO %>% group_by(ITEM) %>% mutate(Quantity = sum(Quantity)) %>% distinct(ITEM, .keep_all = T) %>% ungroup() %>% mutate(Qty.availeble = ifelse(ITEM %in% netsuite_item$Name, netsuite_item[ITEM, "Warehouse.Available"], 0), Qty.add = Quantity - Qty.availeble)
+  TO <- TO %>% group_by(ITEM) %>% mutate(Quantity = sum(Quantity), ITEM = gsub("-V1", "", ITEM)) %>% distinct(ITEM, .keep_all = T) %>% ungroup() %>% mutate(Qty.availeble = ifelse(ITEM %in% netsuite_item$Name, netsuite_item[ITEM, "Warehouse.Available"], 0), Qty.add = Quantity - Qty.availeble)
   if(nrow(TO %>% filter(Qty.add > 0))){
     inventory_update <- data.frame(Date = format(Sys.Date(), "%m/%d/%Y"), ITEM = (TO %>% filter(Qty.add > 0))$ITEM, ADJUST.QTY.BY = (TO %>% filter(Qty.add > 0))$Qty.add, Reason.Code = "CC", MEMO = paste0(RefNo, " China Reserve TO"), WAREHOUSE = "WH-CHINA", External.ID = paste0("IAC-", format(Sys.Date(), "%y%m%d"), "-1"))
     colnames(inventory_update) <- gsub("QTY BY", "QTY. BY", gsub("\\.", " ", colnames(inventory_update)))
@@ -699,14 +707,13 @@ if(nrow(TO)){
 }else{
   print("No TO in this shipment. ")
 }
-shipment <- shipment %>% mutate(PO.REF.NO = ifelse(PO == "PO#NA", gsub("-.*", "", PO.REF.NO), PO.REF.NO), PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
-shipment <- shipment %>% group_by(PO.REF.NO, ITEM) %>% mutate(QUANTITY = sum(QUANTITY), BOX.NO = paste0(BOX.NO, collapse = " | ")) %>% distinct(PO.REF.NO, ITEM, .keep_all = T) %>% ungroup()
+shipment <- shipment %>% mutate(PO.REF.NO = ifelse(PO == "PO#NA", gsub("-[^-]*$", "", PO.REF.NO), PO.REF.NO), PO = paste0("PO#", POn[PO.REF.NO, "Document.Number"]))
+shipment <- shipment %>% group_by(PO.REF.NO, ITEM) %>% mutate(QUANTITY = sum(QUANTITY), ITEM = gsub("-V1", "", ITEM), BOX.NO = paste0(BOX.NO, collapse = " | ")) %>% distinct(PO.REF.NO, ITEM, .keep_all = T) %>% ungroup()
 OverReceive <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), Qty = QUANTITY - Qty.Remain) %>% filter(QUANTITY > Qty.Remain)
 if(nrow(OverReceive)){
-  PO_OverReceive <- OverReceive %>% mutate(PO.TYPE = "Over Received", CATEGORY = "MIX", SEASON = season, REF.NO = paste0("Over.", RefNo), WAREHOUSE = warehouse, VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("Over receiving in shipment ", RefNo), ITEM. = ITEM, QUANTITY. = Qty, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
-    select(PO.TYPE:External.ID) %>% rename_with(~ gsub("\\.", " ", .))
-  PO_OverReceive <- PO_OverReceive %>% group_by(ITEM) %>% mutate(QUANTITY = sum(QUANTITY)) %>% ungroup %>% distinct(ITEM, .keep_all = T)
-  View(PO_OverReceive)
+  View(OverReceive)
+  PO_OverReceive <- OverReceive %>% mutate(PO.TYPE = "Over Received", CATEGORY = "MIX", SEASON = season, REF.NO = paste0("Over.", RefNo), WAREHOUSE = gsub("FBA", "WH-AMZ : FBA", warehouse), VENDOR = "China", CURRENCY = "CAD", ORDER.DATE = format(Sys.Date(), "%m/%d/%Y"), ORDER.PLACED.BY = "Gloria Li", APPROVAL.STATUS = "APPROVED", DUE.DATE = ReceiveDate, MEMO = paste0("Over receiving in shipment ", RefNo), ITEM. = ITEM, QUANTITY. = Qty, Tax.Code = "CA-Zero", External.ID = REF.NO) %>% 
+    select(PO.TYPE:External.ID, REF.NO, MEMO) %>% group_by(ITEM.) %>% mutate(QUANTITY. = sum(QUANTITY.)) %>% distinct(ITEM., .keep_all = T) %>% ungroup() %>% rename_with(~ gsub("\\.", " ", .))
   write.csv(PO_OverReceive, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_PO_", RefNo, "_OverReceive.csv"), row.names = F, na = "")
 }else{
   print("No over-receiving. ")
@@ -718,20 +725,13 @@ write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_"
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000234" # over-receiving PO 
+  p <- "PO#PO000606" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
 }
-shipment <- shipment %>% group_by(ITEM, PO) %>% mutate(QUANTITY = sum(QUANTITY)) %>% ungroup %>% distinct(ITEM, PO, .keep_all = T)
-write.csv(shipment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, ".csv"), row.names = F, quote = F, na = "")
-## generate receiving csv file
-id <- "INBSHIP16"
-receiving <- shipment %>% mutate(ID = id, PO = gsub("PO#PO", "PO-", PO), Item = ITEM, Qty = QUANTITY) %>% select(ID, PO, Item, Qty)
-write.csv(receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving.csv"), row.names = F, quote = F, na = "")
-TO_receiving <- data.frame(TO = "TO000117", Internal.ID = "243637", Item = TO$ITEM, Qty = TO$Quantity)
-TO_receiving <- TO_receiving %>% rename_with(~ gsub("\\.", " ", .))
-write.csv(TO_receiving, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_TO_receiving.csv"), row.names = F, quote = F, na = "")
+shipment <- shipment %>% group_by(PO.REF.NO, ITEM) %>% mutate(QUANTITY = sum(QUANTITY), BOX.NO = paste0(BOX.NO, collapse = " | ")) %>% distinct(PO.REF.NO, ITEM, .keep_all = T) %>% ungroup()
+write.csv(shipment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, ".csv"), row.names = F, quote = F, na = "", fileEncoding = "UTF-8")
 
 # ------------ check shipment Qty -------------------
 RefNo <- "25FWCA7"
