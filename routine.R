@@ -202,7 +202,7 @@ if(month %in% c("09", "10", "11", "12", "01", "02")){in_season <- "F"}else(in_se
 RawData <- list.files(path = "../FBArefill/Raw Data File/", pattern = "All Marketplace by", full.names = T)
 mastersku <- read_xlsx(list.files(path = "../FBArefill/Raw Data File/", pattern = "1-MasterSKU-All-Product-", full.names = T)[1], sheet = "MasterFile", start_row = 4, fill_merged_cells = T, skip_empty_cols = T) %>% `row.names<-`(.[, "MSKU"])
 mastersku_adjust <- mastersku %>% filter(!duplicated(`Adjust SKU`)) %>% `row.names<-`(.[, "Adjust SKU"])
-netsuite_item_S <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("Items_All_", format(Sys.Date(), "%Y%m%d"), ".csv"), full.names = T), as.is = T) %>% filter(Inventory.Warehouse == "WH-SURREY") %>% 
+netsuite_item_S <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Inventory.Warehouse == "WH-SURREY") %>% 
   mutate(Name = Name, Seasons = ifelse(Name %in% mastersku$MSKU, mastersku[Name, "Seasons SKU"], mastersku_adjust[Name, "Seasons SKU"]), SPU = gsub("(\\w+-\\w+)-.*", "\\1", Name)) %>% `row.names<-`(.[, "Name"])
 monR_last_yr <- read.csv(list.files(path = "../Analysis/", pattern = "MonthlyRatio2025_20260112.csv", full.names = T), as.is = T) %>% `row.names<-`(.[, "Category"])
 # mr <- "../Analysis/MonthlyRatio2025.xlsx"
@@ -278,7 +278,7 @@ woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("w
   select(ID, SKU, Name, Seasons, cat, SPU, Regular.price, discount, Qty) %>% `row.names<-`(.[, "SKU"])
 overstock <- woo %>% filter(!grepl(new_season, Seasons), Regular.price > 0) %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
   filter(!is.na(Qty_SPU)) %>% mutate(time_yrs = round(ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), 1), size_percent_missing = gsub("Sizes.missing.0%", "Sizes.missing.<.50%", paste0("Sizes.missing.", as.character(as.integer(ifelse(size_limited[SPU, "percent"] < 0.5, 0, size_limited[SPU, "percent"])*10)*10), "%"))) %>% 
-  select(SKU:Qty_SPU, time_yrs, size_percent_missing) %>% arrange(SKU)
+  select(SKU:Qty, time_yrs, size_percent_missing) %>% arrange(SKU) %>% group_by(SPU) %>% mutate(Surrey_SPU = sum(Qty)) %>% filter(Surrey_SPU > 0)
 write.csv(overstock, file = paste0("../Analysis/Overstock_", Sys.Date(), ".csv"), row.names = F)
 # Email Will
 woo_deals <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regular.price > 0) %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
