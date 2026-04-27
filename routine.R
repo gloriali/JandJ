@@ -20,7 +20,7 @@ netsuite_item_R <- netsuite_item %>% filter(Inventory.Warehouse == "WH-RICHMOND"
 # input: woo > Products > All Products > Export > all
 woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
-PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "ALC", "AWWJ", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
+PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "ALC", "AWWJ", "DRC", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
 #sales <- read.csv("../Clover/Lunar New Year Sales - Variation Prices.csv", as.is = T) %>% `row.names<-`(.[, "SKU"]) 
 #woo <- read.csv(list.files(path = "../woo/", pattern = gsub("-0", "-", paste0("wc-product-export-", format(Sys.Date(), "%d-%m-%Y"))), full.names = T), as.is = T) %>% 
 #  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
@@ -312,7 +312,7 @@ write.csv(Sales_Inv_Next4m, file = paste0("../Analysis/Sales_Inv_Prediction_Next
 # download clover inventory: clover_item > Inventory > Items > Export.
 #category_exclude <- c("FVMU", "PJWU","PLAU", "PTAU", "STORE", "TPLU", "TPSU", "TSWU", "TTLU", "TTSU", "WJAU", "WPSU", "XBMU")
 category_exclude <- c("")
-PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "ALC", "AWWJ", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
+PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "ALC", "AWWJ", "DRC", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
 woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
   filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
 clearance <- read.csv("../Clover/ShopClearance.csv", as.is = T)
