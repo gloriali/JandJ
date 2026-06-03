@@ -12,6 +12,9 @@ library(fuzzyjoin)
 options("openxlsx2.na" = "")
 options("openxlsx2.na.strings" = "")
 
+# Fara comment
+# setwd("C:/Users/Fara ~/OneDrive - Jan and Jul/Gloria Li's files - TWK - Gloria/JandJ")
+
 # input: NS > Items > Export all warehouses
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
