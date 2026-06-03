@@ -81,6 +81,7 @@ netsuite_so <- XHS_so %>% filter(`Financial Status` == "paid", Shipping.Country 
   select(Payment.Option, Class, Order.date, REF.ID, Order.Type, Department, Warehouse, MEMO, Order.ID, Item.SKU, Quantity, Price.level, Rate, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount, Customer, Recipient, Recipient.Phone, Recipient.Email, SHIPPING.CARRIER, SHIPPING.METHOD, SHIPPING.COST)
 Encoding(netsuite_so$Recipient) = "UTF-8"
 write_excel_csv(netsuite_so, file = paste0("../XHS/CashSale-XHS-", format(Sys.Date(), "%Y%m%d"), ".csv"), na = "")
+## CA/US orders
 HSTonly_states <- c("NB", "NL")
 HST_states <- c("NS", "ON", "PE")
 GSTonly_states <- c("AB", "NT", "NU", "YT")
@@ -415,7 +416,7 @@ write.csv(JJ_orders_propotion, file = paste0("../woo/JJ_orders_propotion_", Sys.
 
 # ------------ upload regular POs -------------------
 library(stringi)
-season <- "26S"
+season <- "26F"
 folder <- stri_remove_empty(gsub(" *- *sent.*", "", gsub(paste0("\\.\\.\\/PO\\/order\\/", season, "\\/"), "", list.files(path = paste0("../PO/order/", season, "/"), pattern = "^P"))))
 SeasonStart <- read.csv("../PO/SeasonStart.csv", as.is = T) %>% mutate(receive_date = format(as.Date(paste0(arrival_date, "-2025"), format = "%d-%B-%Y"), "%m/%d/%Y")) %>% `row.names<-`(.[, "category"]) 
 PO_NS <- data.frame(); total <- 0; items <- 0
@@ -565,7 +566,7 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
 season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26FWCA4"; ShippingDate <- "5/12/2026"; ReceiveDate <- "6/12/2026"; AMZ.Shipment.ID <- ""
+RefNo <- "26FWCA3"; ShippingDate <- "4/30/2026"; ReceiveDate <- "5/30/2026"; AMZ.Shipment.ID <- ""
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% filter(Status != "Closed") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
