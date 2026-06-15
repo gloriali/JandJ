@@ -788,3 +788,14 @@ write.csv(netsuite_so, file = paste0("../Clover/SO-clover-", format(Sys.Date(), 
 View(read.csv("../Clover/results.csv", as.is = T) %>% group_by(Item.SKU) %>% mutate(Qty_total = sum(Quantity), Qty_surrey = netsuite_item_S[Item.SKU, "Warehouse.Available"]) %>% filter(Qty_total > Qty_surrey))
 error <- read.csv("../Clover/results.csv", as.is = T) %>% group_by(Item.SKU) %>% mutate(Qty_total = sum(Quantity), Qty_surrey = netsuite_item_S[Item.SKU, "Warehouse.Available"], Item.SKU = ifelse(Qty_total > Qty_surrey, "MISC-ITEM", Item.SKU))
 write.csv(error, file = "../Clover/results.csv", row.names = F, na = "")
+## Sales summary
+sales_0612 <- read.csv("../Clover/LineItemsExport-20260612_0000_PDT-20260612_2359_PDT.csv", as.is = T) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = n()) %>% mutate(Category = gsub("-.*", "", Item.SKU), Date = "Jun-12")
+sales_0612_summary <- sales_0612 %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
+sales_0613 <- read.csv("../Clover/LineItemsExport-20260613_0000_PDT-20260613_2359_PDT.csv", as.is = T) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = n()) %>% mutate(Category = gsub("-.*", "", Item.SKU), Date = "Jun-13")
+sales_0613_summary <- sales_0613 %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
+sales_0614 <- read.csv("../Clover/LineItemsExport-20260614_0000_PDT-20260614_2359_PDT.csv", as.is = T) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = n()) %>% mutate(Category = gsub("-.*", "", Item.SKU), Date = "Jun-14")
+sales_0614_summary <- sales_0614 %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
+sales <- rbind(sales_0612, sales_0613, sales_0614) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = sum(Qty)) %>% mutate(Category = gsub("-.*", "", Item.SKU)) %>% arrange(-Qty)
+sales_summary <- sales %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
+
+
