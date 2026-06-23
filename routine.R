@@ -646,7 +646,7 @@ write.csv(weight_check, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "We
 # ------------ inbound shipment for PO TO combined -------------------
 library(tidyr)
 season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26FWCA1"; ShippingDate <- "3/25/2026"; ReceiveDate <- "4/26/2026"
+RefNo <- "26FWCA7"; ShippingDate <- "5/31/2026"; ReceiveDate <- "6/30/2026"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -694,7 +694,7 @@ if(nrow(TO)){
 }else{
   if(sum(shipment$QUANTITY) == summary[nrow(summary), "QTY"]){print(paste0("Total QTY matches: ", sum(shipment$QUANTITY)))}else{print(paste("Total QTY NOT matching:", sum(shipment$QUANTITY), summary[nrow(summary), "QTY"]))}
 }
-if(Nbox == summary[nrow(summary), "Number.of.Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
+if(Nbox == summary[nrow(summary), "Number of Box"]){print(paste0("Total Box# matches: ", Nbox))}else{print(paste("Total Box# NOT matching:", Nbox, summary[nrow(summary), "Number.of.Box"]))}
 # check for over-receiving
 if(nrow(TO)){
   netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Inventory.Warehouse == unique(TO$FROM.WAREHOUSE)) %>% `row.names<-`(.[, "Name"]) 
