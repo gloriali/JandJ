@@ -798,4 +798,30 @@ sales_0614_summary <- sales_0614 %>% filter(!grepl("MISC", Item.SKU)) %>% group_
 sales <- rbind(sales_0612, sales_0613, sales_0614) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = sum(Qty)) %>% mutate(Category = gsub("-.*", "", Item.SKU)) %>% arrange(-Qty)
 sales_summary <- sales %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
 
-
+# ---------------- For Christine: Wholesale orders in Richmond shop 2026 Jan-June ---------------
+netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
+netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
+customer_wholesaler <- read_xlsx("../Clover/Wholesale Customer List_cash sales.xlsx", sheet = "Wholesale Customer") %>% distinct(Email, .keep_all = T) %>% `row.names<-`(.[, "Email"]) 
+customer <- read.csv("../Clover/Customers.csv", as.is = T) %>% mutate(Phone.Number = na_if(Phone.Number, ""), Email.Address = na_if(Email.Address, "")) %>% mutate(Name = paste0(First.Name, " ", Last.Name)) %>% group_by(Name) %>% mutate(Phone.Number = ifelse(n_distinct(Phone.Number, na.rm = T) == 1, (Phone.Number[!is.na(Phone.Number)])[1], paste(Phone.Number, collapse = "|")), Email.Address = gsub("\\|*NA\\|*", "", ifelse(n_distinct(Email.Address, na.rm = T) == 1, (Email.Address[!is.na(Email.Address)])[1], paste(Email.Address, collapse = "|")))) %>% filter(Name != " ") %>% distinct(Name, .keep_all = T) %>% as.data.frame() %>% `row.names<-`(.[, "Name"])
+clover_so1 <- read.csv("../Clover/LineItemsExport-202601-03.csv", as.is = T) %>% mutate(Item.SKU = ifelse(Item.SKU %in% netsuite_item$Name, Item.SKU, "MISC-ITEM"))
+clover_so2 <- read.csv("../Clover/LineItemsExport-202604-06.csv", as.is = T) %>% mutate(Item.SKU = ifelse(Item.SKU %in% netsuite_item$Name, Item.SKU, "MISC-ITEM"))
+clover_so_wholesale <- rbind(clover_so1, clover_so2) %>% filter(grepl("Wholesaler", Order.Discounts)|grepl("Wholesaler", Discounts))
+payments1 <- read.csv("../Clover/Payments-202601-03.csv", as.is = T)
+payments2 <- read.csv("../Clover/Payments-202604-06.csv", as.is = T)
+payments <- rbind(payments1, payments2) %>% mutate(Phone = customer[Customer.Name, "Phone.Number"], Email = customer[Customer.Name, "Email.Address"]) %>% filter(Result == "SUCCESS") %>% group_by(Order.ID) %>% 
+  mutate(Amount_total = sum(Amount), Wholesale = ifelse(Order.ID %in% clover_so_wholesale$Order.ID, T, F), Tender_Amount = paste0(Tender, ":$", Amount), Tender = ifelse(Wholesale == T, paste(Tender_Amount, collapse = "|"), Tender[1])) %>% ungroup() %>% distinct(Order.ID, .keep_all = T) %>% as.data.frame() %>% `row.names<-`(.[, "Order.ID"])
+netsuite_so <- data.frame()
+for(f in list.files(path = "../Clover/", pattern = "SO-clover-", full.names = T)){
+  netsuite_so <- rbind(netsuite_so, read.csv(f, as.is = T))
+}
+netsuite_so <- netsuite_so %>% distinct(Order.ID, .keep_all = T) %>% `row.names<-`(.[, "Order.ID"]) 
+netsuite_so_wholesale <- clover_so_wholesale %>% mutate(Recipient.Email = payments[Order.ID, "Email"], Company.Name = ifelse(Recipient.Email %in% customer_wholesaler$Email, customer_wholesaler[Recipient.Email, "Company Name"], payments[Order.ID, "Customer.Name"]), Company.ID = ifelse(Recipient.Email %in% customer_wholesaler$Email, customer_wholesaler[Recipient.Email, "ID"], ""), Recipient.Phone = ifelse(Recipient.Email %in% customer_wholesaler$Email, customer_wholesaler[Recipient.Email, "Phone"], payments[Order.ID, "Phone"]), Tender = payments[Order.ID, "Tender"], Amount = payments[Order.ID, "Amount_total"]) %>% 
+  filter(Order.Payment.State == "Paid") %>% mutate(Order.date = format(as.Date(gsub(" .*", "", Line.Item.Date), "%d-%b-%Y"), "%m/%d/%Y")) %>% group_by(Order.date) %>% 
+  mutate(Payment.Option = ifelse(Tender == "Cash", "Cash", ifelse(grepl("WeChat", Tender), "AlphaPay", "Clover")), Class = "FBM : CA", MEMO = "Clover Richmond wholesales", Customer = "54 JJR SHOPR", ID = data.table::rleid(Order.ID), REF.ID = netsuite_so[Order.ID, "REF.ID"], Order.Type = "JJW CA", Department = "Wholesale", Warehouse = "WH-RICHMOND", Quantity = 1, Price.level = "Custom", Rate = Item.Total, Coupon.Discount = Total.Discount + Order.Discount.Proportion, Coupon.Discount = ifelse(Coupon.Discount == 0, NA, Coupon.Discount), Coupon.Code = gsub("NA", "", gsub(" -.*","", paste0(Order.Discounts, Discounts))), Tax.Code = ifelse(Item.Tax.Rate == 0.05, "CA-BC-GST", ifelse(Item.Tax.Rate == 0.12, "CA-BC-TAX", "")), SHIPPING.CARRIER = "", SHIPPING.METHOD = "", SHIPPING.COST = 0) %>% 
+  select(Order.date, REF.ID, Warehouse, Order.ID, Item.SKU, Quantity, Price.level, Rate, Coupon.Discount, Coupon.Code, Tax.Code, Tax.Amount, Amount, Customer, Company.Name, Recipient.Phone, Recipient.Email, SHIPPING.CARRIER, SHIPPING.METHOD, SHIPPING.COST) %>% arrange(REF.ID) %>% group_by(REF.ID, Item.SKU) %>% mutate(Quantity = sum(Quantity), Rate = sum(Rate), Coupon.Discount = sum(Coupon.Discount)) %>% distinct(REF.ID, Item.SKU, .keep_all = T) %>% ungroup()
+write.csv(netsuite_so_wholesale, file = paste0("../Clover/Wholesale-clover-202601-06.csv"), row.names = F, na = "")
+netsuite_so_wholesale_order <- netsuite_so_wholesale %>% group_by(Order.ID) %>% mutate(Discount = sum(Coupon.Discount), Tax = sum(Tax.Amount)) %>%
+  distinct(Order.ID, .keep_all = T) %>% select(Order.date, REF.ID, Warehouse, Order.ID, Discount, Tax, Amount, Customer, Company.Name, Recipient.Phone, Recipient.Email)
+write.csv(netsuite_so_wholesale_order, file = paste0("../Clover/Wholesale-clover-order-202601-06.csv"), row.names = F, na = "")
+netsuite_so_wholesale_month <- netsuite_so_wholesale_order %>% mutate(Month = gsub("\\/.*", "", Order.date)) %>% group_by(Month) %>% mutate(Discount = sum(Discount), Tax = sum(Tax), Amount = sum(Amount)) %>% distinct(Month, .keep_all = T) %>% select(Month, Discount, Tax, Amount)
+write.csv(netsuite_so_wholesale_month, file = paste0("../Clover/Wholesale-clover-month-202601-06.csv"), row.names = F, na = "")
