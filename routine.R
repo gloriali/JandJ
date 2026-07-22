@@ -192,9 +192,9 @@ diff <- AMZPrep_inventory %>% mutate(NS = ifelse(SKU %in% netsuite_item_A$Name, 
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx2)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order03112026.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order07202026.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
-clover_item <- wb_to_df(clover, "Items", skip_empty_rows = T) %>% mutate(Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity), Quantity = ifelse(Name %in% adjust_inventory$ITEM, Quantity + adjust_inventory[Name, "Quantity"], Quantity))
+clover_item <- wb_to_df(clover, "Items", skip_empty_rows = T) %>% mutate(Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity), Quantity = ifelse(Name %in% adjust_inventory$ITEM, Quantity + adjust_inventory[Name, "Quantity"], Quantity)) %>% distinct(Name, .keep_all = T)
 clover_update <- wb_workbook()
 for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
 clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item) |> wb_add_numfmt(sheet = "Tax Rates", dims = "C2:C3", numfmt = "0%")
