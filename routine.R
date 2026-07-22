@@ -288,12 +288,13 @@ overstock <- woo %>% filter(Regular.price > 0) %>% mutate(Qty_SPU = inventory_SP
   select(SKU:Qty, time_yrs, size_percent_missing) %>% arrange(SKU) %>% group_by(SPU) %>% mutate(Surrey_SPU = sum(Qty)) %>% filter(Surrey_SPU > 0)
 write.csv(overstock, file = paste0("../Analysis/Overstock_", Sys.Date(), ".csv"), row.names = F)
 # Email Will
-woo_deals <- woo %>% filter(!grepl(new_season, Seasons), Qty > qty_offline, Regular.price > 0) %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
-  filter(!is.na(Qty_SPU)) %>% mutate(time_yr = ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), time_yrs = paste0("Sold out ", as.character(as.integer(ifelse(time_yr > 3, 3, time_yr)) + 1), " yr"), size_percent_missing = gsub("Sizes.missing.0%", "Sizes.missing.<.50%", paste0("Sizes.missing.", as.character(as.integer(ifelse(size_limited[SPU, "percent"] < 0.5, 0, size_limited[SPU, "percent"])*10)*10), "%"))) %>%
-  rowwise() %>% mutate(Suggest_discount = as.numeric(gsub("% Off", "", discount_method[time_yrs, size_percent_missing]))/100, Suggest_price = round((1 - Suggest_discount) * Regular.price, digits = 2)) %>% arrange(-Suggest_discount, SKU) %>% filter(Suggest_discount > 0) 
-if(month %in% c("02", "03", "04", "05")){woo_deals <- woo_deals %>% filter(!grepl("S", Seasons))}
-if(month %in% c("08", "09", "10", "11")){woo_deals <- woo_deals %>% filter(!grepl("F", Seasons))}
+woo_deals <- woo %>% mutate(Qty_SPU = inventory_SPU[SPU, "qty_SPU"], Qty_WH = inventory_SPU[SPU, "qty_WH"], Qty_AMZ = inventory_SPU[SPU, "qty_AMZ"], MonR_last3m = monR[cat, "T.last3m"], Sales_SPU_last3m = sales_SPU_last3month[SPU, "T.last3m"], Sales_SPU_last3m_JJ = sales_SPU_last3month_JJ[SPU, "T.last3m"], Sales_SPU_1yr = Sales_SPU_last3m/MonR_last3m, Sales_SPU_1yr_JJ = Sales_SPU_last3m_JJ/MonR_last3m, Sales_SPU_1yr_AMZ = sales_SPU_last12month_AMZ[SPU, "T.last12m"]) %>% 
+  filter(!is.na(Qty_SPU)) %>% mutate(time_yr = ifelse(Qty_AMZ >= Sales_SPU_1yr_AMZ, Qty_WH/Sales_SPU_1yr_JJ, Qty_SPU/Sales_SPU_1yr), time_yr = ifelse(is.na(time_yr), 10, time_yr), time_yrs = paste0("Sold out ", as.character(as.integer(ifelse(time_yr > 3, 3, time_yr)) + 1), " yr"), size_percent_missing = gsub("Sizes missing 0%", "Sizes missing < 50%", paste0("Sizes missing ", as.character(as.integer(ifelse(size_limited[SPU, "percent"] < 0.5 | is.na(size_limited[SPU, "percent"]), 0, size_limited[SPU, "percent"])*10)*10), "%"))) %>%
+  rowwise() %>% mutate(Suggest_discount = as.numeric(gsub("% Off", "", discount_method[time_yrs, size_percent_missing]))/100, Suggest_price = round((1 - Suggest_discount) * Regular.price, digits = 2)) %>% arrange(-Suggest_discount, SKU) %>% filter(Suggest_discount > 0) %>% select(ID:Qty_SPU, time_yr:Suggest_price)
+if(month %in% c("01", "02", "03", "04", "05")){woo_deals <- woo_deals %>% filter(!grepl("S", Seasons)); woo <- woo %>% filter(!grepl("F", Seasons), discount > 0)}
+if(month %in% c("07", "08", "09", "10", "11")){woo_deals <- woo_deals %>% filter(!grepl("F", Seasons)); woo <- woo %>% filter(!grepl("S", Seasons), discount > 0)}
 write.csv(woo_deals, file = paste0("../Analysis/Deals_", Sys.Date(), ".csv"), row.names = F)
+write.csv(woo, file = paste0("../Analysis/CurrentDeals_", Sys.Date(), ".csv"), row.names = F)
 # Email Joren, Kamer
 ## Low inventory to adjust ads
 qty_refill <- 12
@@ -580,7 +581,7 @@ POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"]
 Weight_manual <- read_xlsx("../PO/shipment/UnitWeight_ManualCheck.xlsx", sheet = 1) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% rename_with(~ gsub("\\ ", ".", .))
 Weight_master <- read_xlsx(list.files(path = "../PO/shipment/", pattern = "Product&DimsLog", full.names = T), sheet = "DimensionLog", fillMergedCells = T, check_names = T) %>% filter(!is.na(Size), !is.na(Category)) %>% `row.names<-`(paste0(.[, "Category"], "_", .[, "Size"])) %>% mutate(Unit.Weight = round(`Sample.Weight.g.`, 0))
 Unit_weight <- rbind(Weight_manual %>% select(Category, Size, Unit.Weight), Weight_master %>% select(Category, Size, Unit.Weight) %>% filter(!(rownames(Weight_master) %in% rownames(Weight_manual))))
-shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, ".*.xlsx"), recursive = T, full.names = T)
+shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo, " .*.xlsx"), recursive = T, full.names = T)
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- wb_get_sheet_names(wb_load(shipment_in))[]
 summary <- read_xlsx(shipment_in, sheet = 1, fillMergedCells = T)
@@ -611,7 +612,7 @@ for(s in 2:length(sheets)){
   attachment <- rbind(attachment, data.frame(Sheet.Number = c(gsub("-.*", "", shipment_o$BOX.NO), ""), Box.Number = c(gsub(".*-", "", shipment_o$BOX.NO), ""), SKU = c(shipment_o$ITEM, ""), Packing.Slip.QTY = c(shipment_o$QUANTITY, ""), GR.Weight = c(shipment_o$GR.Weight, ""), Unit.Weight.woo = c(shipment_o$Unit.Weight.woo, ""), Unit.Weight.Shipment = c(shipment_o$Unit.Weight.Shipment, ""), EST.Weight.woo = c(shipment_o$EST.Weight.woo, ""), EST.Weight.Shipment = c(shipment_o$EST.Weight.Shipment, ""), Notes = ""))
 }
 print(paste0("Qty: ", sum(shipment$QUANTITY), "; #Boxes: ", Nbox))
-View(summary)
+#View(summary)
 attachment <- attachment %>% rename_with(~ gsub("\\.", " ", .))
 write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_", RefNo, "_receiving_by_box.csv"), row.names = F, quote = F, na = "")
 # check for over-receiving
