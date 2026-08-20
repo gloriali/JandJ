@@ -798,6 +798,21 @@ sales_0614_summary <- sales_0614 %>% filter(!grepl("MISC", Item.SKU)) %>% group_
 sales <- rbind(sales_0612, sales_0613, sales_0614) %>% arrange(Item.SKU) %>% group_by(Item.SKU) %>% summarize(Qty = sum(Qty)) %>% mutate(Category = gsub("-.*", "", Item.SKU)) %>% arrange(-Qty)
 sales_summary <- sales %>% filter(!grepl("MISC", Item.SKU)) %>% group_by(Category) %>% summarize(Qty = sum(Qty)) %>% arrange(-Qty)
 
+# ---------------- B2S Fair 2026 ---------------
+woo <- read.csv(rownames(file.info(list.files(path = "../woo/", pattern = "wc-product-export-", full.names = T)) %>% filter(mtime == max(mtime))), as.is = T) %>% 
+  filter(!is.na(Regular.price) & !duplicated(SKU) & SKU != "") %>% mutate(Sale.price = ifelse(is.na(Sale.price) | (Sys.time() < strptime(Date.sale.price.starts, format = "%Y-%m-%d %H:%M:%S") | Sys.time() > strptime(Date.sale.price.ends, format = "%Y-%m-%d %H:%M:%S")), Regular.price, Sale.price)) %>% `row.names<-`(.[, "SKU"])
+PST <- c("AAA", "ACA", "ACB", "AHJ", "AJA", "AJC", "AJM", "AJP", "AJR", "AJS", "ALF", "ALC", "AWWJ", "DRC", "XBK", "XBM", "XBY", "XLB", "XPC", "GUX", "GUA", "GUB", "GBX", "GHA", "GHX")
+clearance <- read.csv("../Clover/ShopClearance.csv", as.is = T)
+price <- woo %>% mutate(cat = gsub("-.*", "", SKU)) %>% group_by(cat) %>% summarise(Price = max(Regular.price, na.rm = T)) %>% as.data.frame()
+price <- rbind(price, data.frame(cat = c("MISC5", "MISC10", "MISC15", "MISC20", "MISC25", "MISC30", "MISC35", "MISC45", "DBRC", "DBTB", "DBTL", "DBTP", "DLBS", "DWJA", "DWJT", "DWPF", "DWPS", "DWSF", "DWSS", "DXBK", "MAJC"), Price = c(5, 10, 15, 20, 25, 30, 35, 45, 30, 35, 40, 40, 25, 50, 40, 30, 25, 60, 55, 30, 99.99))) %>% `row.names<-`(toupper(.[, "cat"])) 
+clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T)) |> wb_remove_worksheet(sheet = 1) 
+clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, round(woo[Name, "Regular.price"]*0.85, 2), round(price[cat, "Price"]*0.85, 2)), Price = ifelse((Name %in% woo$SKU) & (Price > woo[Name, "Sale.price"]), woo[Name, "Sale.price"], Price), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) %>% select(-cat)
+clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(Sales, Price), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed")) %>% select(all_of(names(clover_item))) %>% distinct(Name, .keep_all = T)
+clover_update <- wb_workbook()
+for(s in clover$get_sheet_names()){clover_update <- clover_update |> wb_add_worksheet(sheet = s) |> wb_add_data(sheet = s, x = wb_to_df(clover, s))}
+clover_update <- clover_update |> wb_clean_sheet(sheet = "Items") |> wb_add_data(sheet = "Items", x = clover_item) |> wb_add_numfmt(sheet = "Tax Rates", dims = "C2:C3", numfmt = "0%")
+wb_save(clover_update, file = paste0("../Clover/inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), overwrite = T)
+
 # ---------------- For Christine: Wholesale orders in Richmond shop 2026 Jan-June ---------------
 netsuite_item <- read.csv(rownames(file.info(list.files(path = "../NetSuite/", pattern = "Items_All_", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) 
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
