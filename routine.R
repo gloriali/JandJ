@@ -129,13 +129,13 @@ netsuite_item <- read.csv(list.files(path = "../NetSuite/", pattern = paste0("It
 netsuite_item[netsuite_item == "" | is.na(netsuite_item)] <- 0
 netsuite_item_S <- netsuite_item %>% filter(Inventory.Warehouse == "WH-SURREY") %>% `row.names<-`(.[, "Name"])
 season <- "26F"
-request <- c("GUA", "GUX", "AJA", "AJC", "AJM", "BCV", "BSW", "BSA", "BRC", "BHT", "BHA", "BTA", "BST", "BSL", "BTB", "BTL", "BTT", "BST", "FAN", "FHA", "FHB", "FHS", "AJR", "FJR", "FJZ", "FJC", "FJM", "FPM", "FMR", "FGR", "FSM", "FVM", "IHT", "IAJ", "IAB", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "JCC", "PCC", "TSW", "PJW", "PLW", "KEH", "KHB", "KHP", "KMN", "KMT", "KGL", "LAB", "LAN", "LAV", "LBT", "LBP", "LCP", "LCT", "SLC", "SLM", "SUK", "SKG", "SKB", "SKX", "SMC", "SMF", "SWS", "MSWS", "WJA", "WJT", "WPF", "WPS", "WSF", "WSS", "WBF", "WBS", "WJO", "WPO", "WHO", "WHR", "WJY", "WPY", "WGF", "WGS", "WMT", "WRM", "XBY", "XBK", "XBM", "XLB", "XPC") # categories to restock for FW
+request <- c("AJA", "AJC", "AJM", "BCV", "BRC", "BHT", "BHA", "BTA", "BST", "BSL", "BTB", "BTL", "BTT", "BST", "FAN", "FHA", "FHB", "FHS", "AJR", "FJR", "FJZ", "FJC", "FJM", "FPM", "FMR", "FGR", "FSM", "FVM", "IHT", "IAJ", "IAB", "IPC", "ICP", "IPS", "ISJ", "ISS", "ISB", "JCC", "PCC", "TSW", "PJW", "PLW", "KEH", "KHB", "KHP", "KMN", "KMT", "KGL", "LAB", "LAN", "LAV", "LBT", "LBP", "LCP", "LCT", "SLC", "SLM", "SUK", "SKG", "SKB", "SKX", "SMC", "SMF", "SWS", "MSWS", "WJA", "WJT", "WPF", "WPS", "WSF", "WSS", "WBF", "WBS", "WJO", "WPO", "WHO", "WHR", "WJY", "WPY", "WGF", "WGS", "WMT", "WRM", "XBY", "XBK", "XBM", "XLB", "XPC") # categories to restock for FW
 #request <- c("SLJ", "SLC", "SLM", "SLO", "SUK", "SWS", "SMC", "SBS", "SMF", "XBM", "XBK", "BRC", "BSL", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HBC", "HBN", "HLC", "HLH", "GUA", "GUX", "GHA", "GHX", "GBX", "PJA", "PJS", "PLA", "PLS", "SLJ", "SLO", "TSA", "TSAV", "TTS", "UGR", "USG", "UT2", "UTG", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST", "AAA", "ACA", "ACB", "AHJ", "ALF") # categories to restock for SS
 #request <- c("ALC", "WJO", "WPO", "MSWS", "JCC", "PCC", "PJW", "TSW", "FGR", "FMR", "FHS", "IHT", "FAN", "FHA", "FHB", "KHB", "KHP", "KMN", "LAV", "BTT", "WSF", "WHO", "WHR", "WJY", "WPY", "IAJ", "IAB", "WBS", "WPF", "WJA", "BCV", "BHA", "BHT", "XBM", "XBK", "XBY", "XLB", "XPC", "WJT", "WPS", "WSS", "BRC", "SLJ", "SLC", "SLM", "SLO", "SUK", "SWS", "SMC", "SBS", "SMF", "BSL", "SKG", "SKB", "SKX", "SJD", "SJF", "SPW", "LBT", "LBP", "HAV0", "HCA0", "HCB0", "HAD0", "HCF0", "HXP", "HXU", "HXC", "HBS", "HBU", "HBC", "HBN", "HLC", "HLH", "GUA", "GUX", "GHA", "GHX", "GBX", "PJA", "PJS", "PLA", "PLS", "SLJ", "SLO", "TSA", "TSAV", "TTS", "UGR", "USG", "UT2", "UTG", "UG1", "UJ1", "USA", "UT1", "UV2", "USS", "UST", "AAA", "ACA", "ACB", "AHJ", "ALF") # categories to restock for B2S
 cat <- c("WJA", "XBY", "XBK", "XBM", "XLB", "XPC", "WHR", "WHO", "FHB", "FAN", "FSM", "BHA", "BHT", "BST", "SMF")
 size <- c("2T", "3T", "4T", "5T", "6Y", "O/S", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "JR1", "JR2", "JR3", "JR4", "S", "M", "L", "XL")
 n <- 2       # Qty per SKU to stock at Richmond
-n1 <- 5   # Qty for SKUs in cat & size to refill
+n1 <- 2   # Qty for SKUs in cat & size to refill
 n_S <- 8 # min Qty in stock at Surrey to request
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), "-upload.xlsx"), full.names = T))
 clover_item <- wb_to_df(clover, "Items") %>% mutate(cat = gsub("-.*", "", Name), Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity)) %>% filter(!duplicated(Name), !is.na(Name)) %>% `row.names<-`(.[, "Name"])
@@ -167,7 +167,7 @@ write.csv(order, file = paste0("../Clover/order_clearance", format(Sys.Date(), "
 # download current Richmond stock: clover_item > Inventory > Items > Export
 library(dplyr)
 library(openxlsx2)
-adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08052026.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
+adjust_inventory <- read.csv(rownames(file.info(list.files(path = "../Clover/", pattern = "order08172026.csv", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% `row.names<-`(.[, "ITEM"])
 clover <- wb_load(list.files(path = "../Clover/", pattern = paste0("inventory", format(Sys.Date(), "%Y%m%d"), ".xlsx"), full.names = T))
 clover_item <- wb_to_df(clover, "Items", skip_empty_rows = T) %>% mutate(Quantity = ifelse(is.na(Quantity) | Quantity < 0, 0, Quantity), Quantity = ifelse(Name %in% adjust_inventory$ITEM, Quantity + adjust_inventory[Name, "Quantity"], Quantity)) %>% distinct(Name, .keep_all = T) %>% filter(Name != "")
 clover_update <- wb_workbook()
