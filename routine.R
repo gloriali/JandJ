@@ -581,8 +581,8 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26FWCA13"; ShippingDate <- "7/20/2026"; ReceiveDate <- "8/28/2026"; AMZ.Shipment.ID <- ""
+season <- "26F"; warehouse <- "WH-CHINA"; PO_suffix <- ""
+RefNo <- "26FWFR1"; ShippingDate <- "7/25/2026"; ReceiveDate <- "7/28/2026"; AMZ.Shipment.ID <- ""
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% filter(Status != "Closed") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
