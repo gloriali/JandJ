@@ -581,8 +581,8 @@ write.csv(PO_NS, file = paste0("../PO/order/CEFA/", "NS_PO_", ID, ".csv"), row.n
 
 # ------------ upload inbound shipment for POs -------------------
 library(tidyr)
-season <- "26F"; warehouse <- "WH-CHINA"; PO_suffix <- ""
-RefNo <- "26FWFR1"; ShippingDate <- "7/25/2026"; ReceiveDate <- "7/28/2026"; AMZ.Shipment.ID <- ""
+season <- "26F"; warehouse <- "AWD-US"; PO_suffix <- "-CA"
+RefNo <- "26FWUS11"; ShippingDate <- "7/16/2026"; ReceiveDate <- "8/16/2026"; AMZ.Shipment.ID <- "STAR-QZSQPKYMXEMBC"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% filter(Status != "Closed") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.Fulfilled.Received = as.numeric(Quantity.Fulfilled.Received), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -638,7 +638,7 @@ if(nrow(OverReceive)){
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000654" # over-receiving PO 
+  p <- "PO#PO000784" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
@@ -659,7 +659,7 @@ write.csv(weight_check, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "We
 # ------------ inbound shipment for PO TO combined -------------------
 library(tidyr)
 season <- "26F"; warehouse <- "WH-SURREY"; PO_suffix <- "-CA"
-RefNo <- "26FWCA7"; ShippingDate <- "5/31/2026"; ReceiveDate <- "6/30/2026"
+RefNo <- "26FWCA14"; ShippingDate <- "8/17/2026"; ReceiveDate <- "9/17/2026"
 PO_detail <- read.csv(rownames(file.info(list.files(path = "../PO/", pattern = "PurchaseOrders", full.names = TRUE)) %>% filter(mtime == max(mtime))), as.is = T) %>% filter(Item != "") %>% 
   mutate(Quantity = as.numeric(Quantity), Quantity.on.Shipments = ifelse(is.na(as.numeric(Quantity.on.Shipments)), 0, as.numeric(Quantity.on.Shipments)), Quantity.Remain = Quantity - Quantity.on.Shipments, Quantity.Remain = ifelse(Quantity.Remain < 0, 0, Quantity.Remain)) %>% `row.names<-`(paste0(.[, "REF.NO"], "_", .[, "Item"]))
 POn <- PO_detail %>% filter(!duplicated(REF.NO)) %>% `row.names<-`(.[, "REF.NO"])
@@ -670,7 +670,7 @@ shipment_in <- list.files(path = "../PO/shipment/", pattern = paste0(".*", RefNo
 memo <- gsub(",", " ", gsub(paste0(RefNo, " *"), "", gsub(" *ETA.*\\/.*", "", gsub("../PO/shipment/+", "", shipment_in))))
 sheets <- wb_get_sheet_names(wb_load(shipment_in))[]
 summary <- read_xlsx(shipment_in, sheet = 1, fillMergedCells = T)
-TO_prefix <- "F25"
+TO_prefix <- "CN"
 TO_Ref <- paste0("TO-C2S", format(as.Date(ShippingDate, "%m/%d/%Y"), "%y%m%d"))
 shipment <- data.frame(); TO <- data.frame(); attachment <- data.frame(); Nbox <- 0
 for(s in 2:length(sheets)){
@@ -741,7 +741,7 @@ write.csv(attachment, file = paste0(gsub("(.*\\/).*", "\\1", shipment_in), "NS_"
 ## upload over-receiving PO 
 # output for NS: upload shipment to Inbound Shipment and attach attachment in Communication tab
 if(nrow(OverReceive)){
-  p <- "PO#PO000641" # over-receiving PO 
+  p <- "PO#PO000778" # over-receiving PO 
   shipment <- shipment %>% mutate(Qty.Remain = PO_detail[paste0(PO.REF.NO, "_", ITEM), "Quantity.Remain"], Qty.Remain = ifelse(is.na(Qty.Remain), 0, Qty.Remain), QUANTITY = ifelse(QUANTITY > Qty.Remain, Qty.Remain, QUANTITY)) %>% filter(PO != "PO#NA") %>% select(-Qty.Remain)
   shipment <- rbind(shipment, data.frame(REF.NO = RefNo, EXPECTED.SHIPPING.DATE = ShippingDate, EXPECTED.DELIVERY.DATE = ReceiveDate, MEMO = memo, PO.REF.NO = paste0("Over.", RefNo), BOX.NO = OverReceive$BOX.NO, ITEM = OverReceive$ITEM, QUANTITY = OverReceive$Qty, LOCATION = warehouse, PO = p)) %>% filter(QUANTITY != 0) %>% 
     mutate(BOX.NO = ifelse(nchar(BOX.NO) > 300, substring(BOX.NO, 1, 299), BOX.NO)) %>% arrange(ITEM) 
