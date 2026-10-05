@@ -62,7 +62,7 @@ if(update_INV){
   clover_item <- wb_to_df(clover, "Items") %>% filter(Name != "") %>% mutate(cat = gsub("-.*", "", Name), Price = ifelse(Name %in% woo$SKU, woo[Name, "Sale.price"], price[cat, "Price"]), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed"), `Alternate Name` = woo[Name, "Name"], `Tax Rates` = ifelse(cat %in% PST, "GST+PST", "GST")) 
 }
 ## extra global discount
-global_discount <- 0.9
+global_discount <- 1.0
 clover_item <- clover_item %>% mutate(Price = ifelse(Name %in% woo$SKU, ifelse(woo[Name, "Sale.price"] < woo[Name, "Regular.price"]*global_discount, woo[Name, "Sale.price"], round(woo[Name, "Regular.price"]*global_discount, 2)), round(price[Categories, "Price"] * global_discount, 2)), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed")) 
 ## clearance price
 clover_item <- clover_item %>% regex_left_join(clearance, by = c("Name" = "Item")) %>% mutate(Price = coalesce(ifelse(Sales > 1, Sales, round(woo[Name, "Regular.price"]*(1-Sales), 2)), Price), Price = ifelse((Name %in% woo$SKU) & (Price > woo[Name, "Sale.price"]), woo[Name, "Sale.price"], Price), `Price Type` = ifelse(is.na(Price), "Variable", "Fixed")) %>% select(all_of(names(clover_item))) %>% distinct(Name, .keep_all = T) %>% filter(!is.na(Name)) 
